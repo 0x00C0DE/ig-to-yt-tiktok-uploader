@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 import {
   buildTikTokAutoUploaderInvocation,
   buildTikTokAutoUploaderLoginInvocation,
+  buildTikTokSessionSaveInvocation,
+  saveTikTokAutoUploaderSession,
   uploadTikTokAutoUploader
 } from "../src/uploaders/tiktok-auto-uploader.js";
 
@@ -111,5 +113,58 @@ test("login uses the configured TikTok session alias independently of the public
     assert.equal(invocation.command, "py");
     assert.deepEqual(invocation.args.slice(-3), ["login", "--name", "local-session-one"]);
     assert.equal(invocation.accountHandle, "@public_tiktok_name");
+  } finally { fs.rmSync(item.cwd, { recursive: true, force: true }); }
+});
+
+test("existing Chrome cookies are saved through stdin without exposing them in command arguments", async () => {
+  const item = fixture();
+  const cookies = [
+    { name: "sessionid", value: "session-secret", domain: ".tiktok.com", path: "/" },
+    { name: "tt-target-idc", value: "useast2a", domain: ".tiktok.com", path: "/" }
+  ];
+  try {
+    const account = {
+      handle: "@creator_handle",
+      sessionName: "profile-session",
+      uploaderPath: item.repo,
+      pythonCommand: "python"
+    };
+    const invocation = buildTikTokSessionSaveInvocation({ cwd: item.cwd, account, cookies });
+    assert.equal(invocation.args.some((value) => String(value).includes("session-secret")), false);
+    assert.match(invocation.stdin, /session-secret/);
+    assert.match(invocation.outputPath, /tiktok_session-profile-session\.cookie$/);
+
+    let received;
+    const result = await saveTikTokAutoUploaderSession({
+      cwd: item.cwd,
+      account,
+      cookies,
+      runProcess: async (value) => {
+        received = value;
+        return { code: 0, stdout: '{"ok": true}', stderr: "" };
+      }
+    });
+    assert.equal(received.stdin, invocation.stdin);
+    assert.equal(result.status, "completed");
+    assert.equal(result.message.includes("session-secret"), false);
+  } finally { fs.rmSync(item.cwd, { recursive: true, force: true }); }
+});
+
+test("session persistence rejects incomplete cookies and unsafe session names", () => {
+  const item = fixture();
+  try {
+    assert.throws(() => buildTikTokSessionSaveInvocation({
+      cwd: item.cwd,
+      account: { sessionName: "missing-dc", uploaderPath: item.repo },
+      cookies: [{ name: "sessionid", value: "secret" }]
+    }), /tt-target-idc/);
+    assert.throws(() => buildTikTokSessionSaveInvocation({
+      cwd: item.cwd,
+      account: { sessionName: "..\\escape", uploaderPath: item.repo },
+      cookies: [
+        { name: "sessionid", value: "secret" },
+        { name: "tt-target-idc", value: "useast2a" }
+      ]
+    }), /session name/i);
   } finally { fs.rmSync(item.cwd, { recursive: true, force: true }); }
 });

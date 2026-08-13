@@ -1,4 +1,52 @@
+import { selectTikTokSessionCookies } from "./tiktok-session.js";
+
 const BRIDGE = "http://127.0.0.1:43117";
+const activeSessionCaptures = new Set();
+
+async function report(jobId, status, message = "", result = null) {
+  const response = await fetch(`${BRIDGE}/api/jobs/${encodeURIComponent(jobId)}/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, message, result })
+  });
+  if (!response.ok) throw new Error(`Could not report job status (${response.status})`);
+}
+
+async function captureTikTokSession(tabId, jobId) {
+  if (activeSessionCaptures.has(tabId)) return false;
+  activeSessionCaptures.add(tabId);
+  const target = { tabId };
+  let attached = false;
+  try {
+    await chrome.debugger.attach(target, "1.3");
+    attached = true;
+    const response = await chrome.debugger.sendCommand(target, "Network.getCookies", {
+      urls: ["https://www.tiktok.com/"]
+    });
+    const selection = selectTikTokSessionCookies(response.cookies);
+    if (!selection.ready) return false;
+
+    await report(jobId, "completed", "TikTok session captured from the selected Chrome profile", {
+      cookies: selection.cookies
+    });
+    await chrome.storage.session.remove(`tiktok_session_job_${tabId}`);
+    await chrome.tabs.remove(tabId).catch(() => {});
+    return true;
+  } finally {
+    if (attached) await chrome.debugger.detach(target).catch(() => {});
+    activeSessionCaptures.delete(tabId);
+  }
+}
+
+async function capturePendingTikTokSessions() {
+  const stored = await chrome.storage.session.get(null);
+  const pending = Object.entries(stored)
+    .filter(([key, value]) => key.startsWith("tiktok_session_job_") && value)
+    .map(([key, jobId]) => ({ tabId: Number(key.slice("tiktok_session_job_".length)), jobId }));
+  for (const item of pending) {
+    await captureTikTokSession(item.tabId, item.jobId).catch(() => {});
+  }
+}
 
 async function setLocalFile(tabId, jobId) {
   const response = await fetch(`${BRIDGE}/api/jobs/${encodeURIComponent(jobId)}`);
@@ -33,7 +81,9 @@ async function poll() {
     const stored = await chrome.storage.local.get("chromeProfile");
     const chromeProfile = String(stored.chromeProfile || "").trim();
     for (let index = 0; index < 5; index++) {
-      const query = chromeProfile ? `?chromeProfile=${encodeURIComponent(chromeProfile)}` : "";
+      const parameters = new URLSearchParams({ tiktokSession: "1" });
+      if (chromeProfile) parameters.set("chromeProfile", chromeProfile);
+      const query = `?${parameters.toString()}`;
       const response = await fetch(`${BRIDGE}/api/jobs/next${query}`);
       if (!response.ok) break;
       const job = await response.json();
@@ -47,6 +97,13 @@ async function poll() {
           active: true
         });
         await chrome.storage.session.set({ [`job_${tab.id}`]: job.id });
+      } else if (job.platform === "tiktok-session") {
+        const tab = await chrome.tabs.create({
+          url: "https://www.tiktok.com/",
+          active: true
+        });
+        await chrome.storage.session.set({ [`tiktok_session_job_${tab.id}`]: job.id });
+        await captureTikTokSession(tab.id, job.id).catch(() => {});
       } else if (job.platform === "tiktok") {
         const tab = await chrome.tabs.create({
           url: "https://www.tiktok.com/tiktokstudio/upload",
@@ -68,7 +125,11 @@ async function poll() {
 
 chrome.runtime.onInstalled.addListener(() => chrome.alarms.create("reel-bridge", { periodInMinutes: 0.5 }));
 chrome.runtime.onStartup.addListener(() => chrome.alarms.create("reel-bridge", { periodInMinutes: 0.5 }));
-chrome.alarms.onAlarm.addListener((alarm) => { if (alarm.name === "reel-bridge") poll(); });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "reel-bridge") {
+    poll().then(capturePendingTikTokSessions).catch(() => {});
+  }
+});
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "poll") {
     poll().then(() => sendResponse({ ok: true }));
@@ -109,5 +170,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   return false;
 });
-chrome.tabs.onRemoved.addListener((tabId) => chrome.storage.session.remove(`job_${tabId}`));
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status !== "complete") return;
+  const key = `tiktok_session_job_${tabId}`;
+  chrome.storage.session.get(key).then((value) => {
+    if (value[key]) return captureTikTokSession(tabId, value[key]);
+  }).catch(() => {});
+});
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  const uploadKey = `job_${tabId}`;
+  const sessionKey = `tiktok_session_job_${tabId}`;
+  const stored = await chrome.storage.session.get([uploadKey, sessionKey]).catch(() => ({}));
+  await chrome.storage.session.remove([uploadKey, sessionKey]).catch(() => {});
+  if (stored[sessionKey]) {
+    await report(stored[sessionKey], "failed", "TikTok setup tab closed before the session was captured").catch(() => {});
+  }
+});
 poll();

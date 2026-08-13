@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 
 const SUPPORTED_VIDEO = new Set([".mp4", ".mov", ".webm"]);
+const REQUIRED_SESSION_COOKIES = ["sessionid", "tt-target-idc"];
 
 function asSwitch(value, defaultValue) {
   return String(Number(value === undefined ? defaultValue : Boolean(value)));
@@ -15,6 +16,16 @@ function normalizeHandle(value) {
 
 function resolveFrom(base, value) {
   return path.isAbsolute(value) ? value : path.resolve(base, value);
+}
+
+function accountSession(account) {
+  const accountHandle = normalizeHandle(account.handle || account.label || account.id);
+  const sessionName = account.sessionName || accountHandle?.replace(/^@/, "");
+  if (!sessionName) throw new Error("TikTok session name is missing from the account configuration");
+  if (!/^[A-Za-z0-9._-]+$/.test(sessionName)) {
+    throw new Error("TikTok session name may contain only letters, numbers, dots, underscores, and hyphens");
+  }
+  return { accountHandle, sessionName };
 }
 
 export function buildTikTokAutoUploaderInvocation({ cwd, videoPath, metadata, account, mode }) {
@@ -31,9 +42,7 @@ export function buildTikTokAutoUploaderInvocation({ cwd, videoPath, metadata, ac
   if (!fs.existsSync(path.join(uploaderRoot, "cli.py"))) {
     throw new Error(`TikTokAutoUploader is not installed at ${uploaderRoot}`);
   }
-  const accountHandle = normalizeHandle(account.handle || account.label || account.id);
-  const sessionName = account.sessionName || accountHandle?.replace(/^@/, "");
-  if (!sessionName) throw new Error("TikTok session name is missing from the account configuration");
+  const { accountHandle, sessionName } = accountSession(account);
   const cookieDirectory = resolveFrom(uploaderRoot, account.cookiesDirectory || "CookiesDir");
   const cookieFile = path.join(cookieDirectory, `tiktok_session-${sessionName}.cookie`);
   if (!fs.existsSync(cookieFile)) {
@@ -71,15 +80,50 @@ export function buildTikTokAutoUploaderLoginInvocation({ cwd, account }) {
   const uploaderRoot = resolveFrom(cwd, account.uploaderPath || ".vendor/TiktokAutoUploader");
   const entrypoint = path.join(uploaderRoot, "cli.py");
   if (!fs.existsSync(entrypoint)) throw new Error(`TikTokAutoUploader is not installed at ${uploaderRoot}`);
-  const accountHandle = normalizeHandle(account.handle || account.label || account.id);
-  const sessionName = account.sessionName || accountHandle?.replace(/^@/, "");
-  if (!sessionName) throw new Error("TikTok session name is missing from the account configuration");
+  const { accountHandle, sessionName } = accountSession(account);
   return {
     command: process.env.TIKTOK_PYTHON || account.pythonCommand || "python",
     cwd: uploaderRoot,
     timeoutMs: Number(account.loginTimeoutMs) > 0 ? Number(account.loginTimeoutMs) : 20 * 60_000,
     accountHandle: accountHandle || `@${sessionName}`,
     args: [entrypoint, "login", "--name", sessionName]
+  };
+}
+
+export function buildTikTokSessionSaveInvocation({ cwd, account, cookies }) {
+  const uploaderRoot = resolveFrom(cwd, account.uploaderPath || ".vendor/TiktokAutoUploader");
+  if (!fs.existsSync(path.join(uploaderRoot, "cli.py"))) {
+    throw new Error(`TikTokAutoUploader is not installed at ${uploaderRoot}`);
+  }
+  const { accountHandle, sessionName } = accountSession(account);
+  const supplied = new Map(
+    (Array.isArray(cookies) ? cookies : [])
+      .filter((cookie) => REQUIRED_SESSION_COOKIES.includes(cookie?.name) && cookie?.value)
+      .map((cookie) => [cookie.name, cookie])
+  );
+  const missing = REQUIRED_SESSION_COOKIES.filter((name) => !supplied.has(name));
+  if (missing.length) throw new Error(`TikTok session is missing required cookie(s): ${missing.join(", ")}`);
+  const minimalCookies = REQUIRED_SESSION_COOKIES.map((name) => {
+    const cookie = supplied.get(name);
+    return {
+      name,
+      value: String(cookie.value),
+      domain: String(cookie.domain || ".tiktok.com"),
+      path: String(cookie.path || "/"),
+      secure: Boolean(cookie.secure),
+      httpOnly: Boolean(cookie.httpOnly)
+    };
+  });
+  const cookieDirectory = resolveFrom(uploaderRoot, account.cookiesDirectory || "CookiesDir");
+  const outputPath = path.join(cookieDirectory, `tiktok_session-${sessionName}.cookie`);
+  return {
+    command: process.env.TIKTOK_PYTHON || account.pythonCommand || "python",
+    cwd: uploaderRoot,
+    timeoutMs: 30_000,
+    accountHandle: accountHandle || `@${sessionName}`,
+    outputPath,
+    stdin: JSON.stringify({ cookies: minimalCookies }),
+    args: [path.join(cwd, "scripts", "save_tiktok_session.py"), "--output", outputPath]
   };
 }
 
@@ -101,6 +145,10 @@ export function runTikTokAutoUploaderProcess(invocation) {
     }, invocation.timeoutMs);
     child.once("error", (error) => { clearTimeout(timer); reject(error); });
     child.once("exit", (code) => { clearTimeout(timer); resolve({ code, stdout, stderr }); });
+    if (invocation.stdin !== undefined) {
+      child.stdin.on("error", () => {});
+      child.stdin.end(invocation.stdin);
+    }
   });
 }
 
@@ -128,4 +176,18 @@ export async function loginTikTokAutoUploader(input) {
     throw new Error(`TikTokAutoUploader login failed for ${invocation.accountHandle}: ${detail.slice(-2000)}`);
   }
   return { status: "completed", message: `TikTok session saved for ${invocation.accountHandle}` };
+}
+
+export async function saveTikTokAutoUploaderSession(input) {
+  const invocation = buildTikTokSessionSaveInvocation(input);
+  const runProcess = input.runProcess || runTikTokAutoUploaderProcess;
+  const outcome = await runProcess(invocation);
+  if (outcome.code !== 0) {
+    const detail = String(outcome.stderr || outcome.stdout || `process exited with code ${outcome.code}`).trim();
+    throw new Error(`Could not save TikTok session for ${invocation.accountHandle}: ${detail.slice(-1000)}`);
+  }
+  return {
+    status: "completed",
+    message: `TikTok session imported from the selected Chrome profile for ${invocation.accountHandle}`
+  };
 }

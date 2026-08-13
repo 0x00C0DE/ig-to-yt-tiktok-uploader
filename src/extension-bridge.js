@@ -6,9 +6,11 @@ import crypto from "node:crypto";
 const HOST = "127.0.0.1";
 const PORT = 43117;
 
-export function selectQueuedJob(jobs, chromeProfile) {
+export function selectQueuedJob(jobs, chromeProfile, capabilities = {}) {
   return jobs.find((item) =>
-    item.status === "queued" && (!item.chromeProfile || item.chromeProfile === chromeProfile)
+    item.status === "queued" &&
+    (!item.chromeProfile || item.chromeProfile === chromeProfile) &&
+    (item.platform !== "tiktok-session" || capabilities.tiktokSession === true)
   );
 }
 
@@ -64,6 +66,15 @@ export class ExtensionBridge {
     });
   }
 
+  enqueueTikTokSession({ accountHandle }) {
+    return this.enqueue({
+      platform: "tiktok-session",
+      videoPath: null,
+      metadata: { accountHandle },
+      mode: "setup"
+    });
+  }
+
   wait(job, timeout = 10 * 60_000) {
     return new Promise((resolve, reject) => {
       const deadline = Date.now() + timeout;
@@ -87,7 +98,9 @@ export class ExtensionBridge {
     }
     if (url.pathname === "/api/jobs/next") {
       const requestedProfile = url.searchParams.get("chromeProfile");
-      const job = selectQueuedJob([...this.jobs.values()], requestedProfile);
+      const job = selectQueuedJob([...this.jobs.values()], requestedProfile, {
+        tiktokSession: url.searchParams.get("tiktokSession") === "1"
+      });
       if (!job) return json(response, 200, {});
       job.status = "claimed";
       return json(response, 200, { id: job.id, platform: job.platform });

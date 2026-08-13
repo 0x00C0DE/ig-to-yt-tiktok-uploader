@@ -102,7 +102,7 @@ node src/cli.js sync --handle "@source_handle" --youtube yt-main --chrome-profil
 
 The extension does not switch Chrome profiles itself. The matching Chrome profile must be open, have the unpacked extension installed, and have the same logical alias saved in its extension popup. Other profiles can remain open; they will not claim a job addressed to `work`.
 
-The extension uses TikTok's ordinary file-change flow for compatibility with TikTok Studio. For YouTube, it uses Chrome's `debugger` permission only long enough to assign the downloaded local MP4 to YouTube's native hidden file input, then immediately detaches. Chrome may briefly display a developer-tools control banner during YouTube file assignment.
+The extension uses TikTok's ordinary file-change flow for compatibility with TikTok Studio. For YouTube, it uses Chrome's `debugger` permission only long enough to assign the downloaded local MP4 to YouTube's native hidden file input. During TikTokAutoUploader setup it uses that permission to read only the `sessionid` and `tt-target-idc` cookies from the selected TikTok tab. It immediately detaches after either operation. Chrome may briefly display a developer-tools control banner.
 
 In `publish` mode, the upload manager starts the configured TikTok and YouTube adapters concurrently for each Reel. The harness waits for both destination results before moving to the next Reel. In `draft` mode, Chrome-extension fields are populated but require review confirmation; the official TikTok API and TikTokAutoUploader adapters support publish mode only.
 
@@ -125,6 +125,7 @@ YouTube and TikTok accounts remain separate even when both public handles are th
         "handle": "@creator_handle",
         "label": "Main TikTok profile",
         "uploadMethod": "tiktok-auto-uploader",
+        "loginMethod": "extension",
         "sessionName": "creator-tiktok",
         "uploaderPath": ".vendor/TiktokAutoUploader",
         "pythonCommand": "python"
@@ -179,22 +180,36 @@ After installing the upstream uploader and configuring a TikTok alias with `"upl
 npm.cmd run setup -- --platform tiktok --account tt-main
 ```
 
-The upstream login opens Chrome once. Sign into the TikTok profile corresponding to the configured `handle`. The session is saved as `.vendor/TiktokAutoUploader/CookiesDir/tiktok_session-<sessionName>.cookie`. The cookie file, `.vendor/`, `.env`, and `CookiesDir/` are ignored by Git. The harness never prints cookie contents.
+The default `loginMethod: "extension"` routes setup to the already-running Chrome profile selected by `defaults.chromeProfile` or `--chrome-profile`. That profile must have the unpacked extension loaded, its matching logical alias saved in the extension popup, and TikTok already signed in. Setup opens `tiktok.com` in that same profile, imports only the two cookies required by TikTokAutoUploader, confirms the ignored local session file, and closes the setup tab. It does not start Chromium, an incognito window, or a separate Chrome profile.
+
+After updating the extension files, reload **Social Reel Bridge** from `chrome://extensions` in the selected profile before running setup. If more than one Chrome profile is configured, select one explicitly:
+
+```powershell
+npm.cmd run setup -- --platform tiktok --account tt-main --chrome-profile work
+```
+
+The session is saved as `.vendor/TiktokAutoUploader/CookiesDir/tiktok_session-<sessionName>.cookie`. The cookie file, `.vendor/`, `.env`, and `CookiesDir/` are ignored by Git. Cookie values are passed only through standard input to the local persistence helper; they are never placed in command arguments, logs, the ledger, or Git.
 
 Every TikTok alias has its own `sessionName`; run setup once for each alias. If the upload reports an expired or missing session, remove only that alias's cookie file and rerun setup.
 
-### Chrome extension and direct-browser sessions
+The upstream isolated-browser login remains available only as an explicit fallback:
+
+```powershell
+npm.cmd run setup -- --platform tiktok --account tt-main --login-method isolated-browser
+```
+
+### Chrome extension and isolated-browser sessions
 
 With `defaults.uploadMethod` set to `extension`, the extension uses the TikTok and YouTube accounts already signed into the selected Chrome profile. Destination aliases and `handle` values control configuration, logging, and ledger identity; selecting a Chrome profile routes the browser job but does not cryptographically verify the active YouTube/TikTok web account. Confirm the visible account in each configured profile before unattended publishing.
 
-The optional direct Playwright fallback uses separate persistent sessions and can be initialized with:
+The optional isolated-browser fallbacks use their own browser state instead of the selected running Chrome profile. They can be initialized with:
 
 ```powershell
-npm.cmd run setup -- --platform tiktok --account tt-main
+npm.cmd run setup -- --platform tiktok --account tt-main --login-method isolated-browser
 npm.cmd run setup -- --platform youtube --account yt-main
 ```
 
-Those fallback sessions are stored under `.sessions/` and ignored by Git. They are not used by the current-session Chrome extension or by TikTokAutoUploader.
+Playwright fallback sessions are stored under `.sessions/`; TikTokAutoUploader's isolated fallback writes its cookie beneath `.vendor/TiktokAutoUploader/CookiesDir/`. Both locations are ignored by Git and are separate from the current-session Chrome extension.
 
 ## Transfer
 
@@ -300,7 +315,7 @@ Deep discovery uses Instaloader profile pagination before falling back to the vi
 - `config.json`, `.env`, `.vendor/`, `.sessions/`, cookies, downloaded media, state, logs, Python caches, and coverage output are ignored by Git.
 - Store access tokens and proxies in environment variables or a secret manager. Never put their values in account configuration or command history.
 - TikTokAutoUploader cookie files grant account access. Protect them like passwords and remove an individual cookie when revoking that local session.
-- The extension requests `tabs`, `storage`, and `debugger` permissions. It attaches the debugger only long enough to assign a local file to YouTube's native input, then detaches.
+- The extension requests `tabs`, `storage`, and `debugger` permissions. It attaches the debugger only long enough to assign a local file to YouTube's native input or capture TikTokAutoUploader's two required TikTok cookies, then detaches.
 - The harness bridge listens only on `127.0.0.1:43117` while a run is active. Do not expose that port through a proxy or tunnel.
 - Download and publish only media you own or are authorized to redistribute.
 
@@ -309,6 +324,8 @@ Deep discovery uses Instaloader profile pagination before falling back to the vi
 - **Python rejected during installation:** upstream requires Python 3.9+. Install a newer Python and set `$env:TIKTOK_PYTHON` to its executable before running `npm.cmd run install:tiktok-uploader`.
 - **Uploader not installed:** run `npm.cmd run install:tiktok-uploader`. The installer verifies the pinned upstream revision instead of silently using a different checkout.
 - **Session cookie missing or expired:** rerun `npm.cmd run setup -- --platform tiktok --account tt-main` for that exact alias.
+- **Setup opens no TikTok tab:** reload the unpacked extension in the intended Chrome profile, save that profile's logical alias in the extension popup, and confirm that the alias matches `defaults.chromeProfile` or `--chrome-profile`.
+- **Setup asks for a logical Chrome profile:** migrate the legacy `defaults.chromeProfileDirectory` setting to a named entry in `chromeProfiles`, set `defaults.chromeProfile` to that alias, and save the same alias in the extension popup.
 - **Dependency/import failure:** rerun the installer using the same Python executable configured as `pythonCommand`.
 - **Signature/Chromium failure:** from `.vendor/TiktokAutoUploader/tiktok_uploader/tiktok-signature`, run `npm.cmd install` and `npx.cmd playwright install chromium`.
 - **TikTok rejects the upload:** the ledger keeps TikTok in `needs_review` while retaining an independently successful YouTube result. Review the platform-aware terminal error before retrying.
