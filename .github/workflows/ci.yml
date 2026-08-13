@@ -22,4 +22,4 @@ jobs:
           python-version: "3.11"
       - run: npm ci
       - run: npm run verify
-      - run: python -m py_compile scripts/instagram_discovery.py scripts/tiktok_auto_uploader_bridge.py
+      - run: python -m py_compile scripts/instagram_discovery.py scripts/tiktok_auto_uploader_bridge.py scripts/save_tiktok_session.py

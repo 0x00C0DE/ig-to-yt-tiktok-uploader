@@ -24,3 +24,24 @@ test("an unscoped job remains backwards compatible with any extension profile", 
   assert.equal(selectQueuedJob(jobs, "work")?.id, "unscoped");
   assert.equal(selectQueuedJob(jobs, null)?.id, "unscoped");
 });
+
+test("TikTok session setup jobs are scoped to the selected existing Chrome profile", () => {
+  const bridge = new ExtensionBridge({ chromeProfile: "personal" });
+  const job = bridge.enqueueTikTokSession({ accountHandle: "@creator" });
+
+  assert.equal(job.platform, "tiktok-session");
+  assert.equal(job.mode, "setup");
+  assert.equal(job.chromeProfile, "personal");
+  assert.deepEqual(job.metadata, { accountHandle: "@creator" });
+  assert.equal(job.videoPath, null);
+});
+
+test("an older extension cannot claim a TikTok session-capture job", () => {
+  const jobs = [{ id: "session-job", platform: "tiktok-session", status: "queued", chromeProfile: "personal" }];
+
+  assert.equal(selectQueuedJob(jobs, "personal"), undefined);
+  assert.equal(
+    selectQueuedJob(jobs, "personal", { tiktokSession: true })?.id,
+    "session-job"
+  );
+});

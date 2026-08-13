@@ -20,6 +20,7 @@
         "label": "Main TikTok",
         "handle": "@tiktok_handle",
         "uploadMethod": "tiktok-auto-uploader",
+        "loginMethod": "extension",
         "sessionName": "tiktok-main",
         "uploaderPath": ".vendor/TiktokAutoUploader",
         "pythonCommand": "python",

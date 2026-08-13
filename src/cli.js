@@ -15,7 +15,11 @@ import { ExtensionBridge } from "./extension-bridge.js";
 import { selectDestinations } from "./destinations.js";
 import { removeUploadedVideo } from "./cleanup.js";
 import { UploadManager } from "./upload-manager.js";
-import { loginTikTokAutoUploader, uploadTikTokAutoUploader } from "./uploaders/tiktok-auto-uploader.js";
+import {
+  loginTikTokAutoUploader,
+  uploadTikTokAutoUploader
+} from "./uploaders/tiktok-auto-uploader.js";
+import { setupTikTokAutoUploaderInChrome } from "./tiktok-setup.js";
 
 function parseArgs(argv) {
   const [command = "help", ...rest] = argv;
@@ -68,8 +72,20 @@ async function setup(cwd, options) {
   const account = requireAccount(config, platform, accountId);
   const chromeProfile = resolveChromeProfile(config, options["chrome-profile"]);
   if (platform === "tiktok" && account.uploadMethod === "tiktok-auto-uploader") {
-    console.log(`[TikTok][${account.handle || account.label || accountId}] Opening TikTokAutoUploader login...`);
-    const result = await loginTikTokAutoUploader({ cwd, account });
+    const loginMethod = options["login-method"] || account.loginMethod || "extension";
+    if (loginMethod === "isolated-browser") {
+      console.log(`[TikTok][${account.handle || account.label || accountId}] Opening isolated TikTokAutoUploader login...`);
+      const result = await loginTikTokAutoUploader({ cwd, account });
+      console.log(result.message);
+      return;
+    }
+    if (loginMethod !== "extension") {
+      throw new Error("TikTok login method must be 'extension' or 'isolated-browser'");
+    }
+    console.log(
+      `[TikTok][${account.handle || account.label || accountId}] Requesting the existing ${describeChromeProfile(chromeProfile)}...`
+    );
+    const result = await setupTikTokAutoUploaderInChrome({ cwd, account, chromeProfile });
     console.log(result.message);
     return;
   }

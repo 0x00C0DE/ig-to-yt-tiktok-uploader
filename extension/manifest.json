@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Social Reel Bridge",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Uploads locally prepared Instagram Reels to TikTok and YouTube using a selected Chrome profile.",
   "permissions": ["alarms", "tabs", "storage", "debugger"],
   "host_permissions": [

@@ -10,6 +10,14 @@ test("example configuration defaults to publish when TikTokAutoUploader is enabl
   assert.equal(example.defaults.mode, "publish");
 });
 
+test("example TikTokAutoUploader accounts import login from the selected Chrome extension", () => {
+  const example = JSON.parse(fs.readFileSync(new URL("../config.example.json", import.meta.url), "utf8"));
+  const account = Object.values(example.accounts.tiktok || {})
+    .find((value) => value.uploadMethod === "tiktok-auto-uploader");
+  assert.equal(account?.loginMethod, "extension");
+  assert.ok(example.defaults.chromeProfile);
+});
+
 test("tracked examples use generic handles and expose selectable Chrome profiles", () => {
   const readme = fs.readFileSync(new URL("../README.md", import.meta.url), "utf8");
   const exampleText = fs.readFileSync(new URL("../config.example.json", import.meta.url), "utf8");
