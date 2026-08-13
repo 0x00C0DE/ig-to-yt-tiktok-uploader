@@ -15,7 +15,7 @@ function fixture() {
   const cookies = path.join(repo, "CookiesDir");
   fs.mkdirSync(cookies, { recursive: true });
   fs.writeFileSync(path.join(repo, "cli.py"), "# fixture");
-  fs.writeFileSync(path.join(cookies, "tiktok_session-ihooneez.cookie"), "fixture-secret");
+  fs.writeFileSync(path.join(cookies, "tiktok_session-creator-session.cookie"), "fixture-secret");
   const videoPath = path.join(cwd, "ABC.mp4");
   fs.writeFileSync(videoPath, "video");
   return { cwd, repo, videoPath };
@@ -29,12 +29,12 @@ test("maps account handle, local session, caption, and upload settings to the up
       metadata: { caption: "caption #one" },
       mode: "publish",
       account: {
-        handle: "@ihooneez", sessionName: "ihooneez", uploaderPath: item.repo,
+        handle: "@creator_handle", sessionName: "creator-session", uploaderPath: item.repo,
         visibility: 1, allowComment: false, allowDuet: true, allowStitch: true
       }
     });
-    assert.equal(invocation.accountHandle, "@ihooneez");
-    assert.ok(invocation.args.includes("ihooneez"));
+    assert.equal(invocation.accountHandle, "@creator_handle");
+    assert.ok(invocation.args.includes("creator-session"));
     assert.ok(invocation.args.includes("caption #one"));
     assert.ok(invocation.args.includes("1"));
   } finally { fs.rmSync(item.cwd, { recursive: true, force: true }); }
@@ -46,12 +46,12 @@ test("a successful mocked upstream process returns a completed structured result
     const calls = [];
     const result = await uploadTikTokAutoUploader({
       ...item, metadata: { caption: "hello" }, mode: "publish",
-      account: { handle: "@ihooneez", sessionName: "ihooneez", uploaderPath: item.repo },
+      account: { handle: "@creator_handle", sessionName: "creator-session", uploaderPath: item.repo },
       runProcess: async (invocation) => { calls.push(invocation); return { code: 0, stdout: "Published successfully", stderr: "" }; }
     });
     assert.equal(calls.length, 1);
     assert.equal(result.status, "completed");
-    assert.match(result.message, /@ihooneez/);
+    assert.match(result.message, /@creator_handle/);
   } finally { fs.rmSync(item.cwd, { recursive: true, force: true }); }
 });
 
@@ -62,7 +62,7 @@ test("missing TikTok session credentials fail before any network process starts"
   try {
     await assert.rejects(() => uploadTikTokAutoUploader({
       ...item, metadata: { caption: "hello" }, mode: "publish",
-      account: { handle: "@ihooneez", sessionName: "missing", uploaderPath: item.repo },
+      account: { handle: "@creator_handle", sessionName: "missing", uploaderPath: item.repo },
       runProcess: async () => { invoked = true; }
     }), /session.*missing|cookie/i);
     assert.equal(invoked, false);
@@ -74,13 +74,13 @@ test("missing upstream installation and malformed media fail clearly", async () 
   try {
     assert.throws(() => buildTikTokAutoUploaderInvocation({
       ...item, metadata: { caption: "hello" }, mode: "publish",
-      account: { handle: "@ihooneez", sessionName: "ihooneez", uploaderPath: path.join(item.cwd, "missing") }
+      account: { handle: "@creator_handle", sessionName: "creator-session", uploaderPath: path.join(item.cwd, "missing") }
     }), /not installed/i);
     const bad = path.join(item.cwd, "bad.txt");
     fs.writeFileSync(bad, "bad");
     assert.throws(() => buildTikTokAutoUploaderInvocation({
       cwd: item.cwd, repo: item.repo, videoPath: bad, metadata: { caption: "hello" }, mode: "publish",
-      account: { handle: "@ihooneez", sessionName: "ihooneez", uploaderPath: item.repo }
+      account: { handle: "@creator_handle", sessionName: "creator-session", uploaderPath: item.repo }
     }), /unsupported TikTok video/i);
   } finally { fs.rmSync(item.cwd, { recursive: true, force: true }); }
 });
@@ -90,7 +90,7 @@ test("upstream authentication errors are returned without leaking cookie content
   try {
     await assert.rejects(() => uploadTikTokAutoUploader({
       ...item, metadata: { caption: "hello" }, mode: "publish",
-      account: { handle: "@ihooneez", sessionName: "ihooneez", uploaderPath: item.repo },
+      account: { handle: "@creator_handle", sessionName: "creator-session", uploaderPath: item.repo },
       runProcess: async () => ({ code: 2, stdout: "", stderr: "TikTok session expired" })
     }), (error) => /session expired/.test(error.message) && !/fixture-secret/.test(error.message));
   } finally { fs.rmSync(item.cwd, { recursive: true, force: true }); }

@@ -17,7 +17,7 @@ function chromeIsRunning() {
 }
 
 export async function openAccountBrowser({ cwd, platform, accountId, headless = false, chromeProfileDirectory }) {
-  const usingSystemProfile = Boolean(chromeProfileDirectory && platform !== "instagram");
+  const usingSystemProfile = Boolean(chromeProfileDirectory);
   let userDataDir = path.join(cwd, ".sessions", platform, accountId);
   if (usingSystemProfile) {
     const sourceRoot = path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "User Data");

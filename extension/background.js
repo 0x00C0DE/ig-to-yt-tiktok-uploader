@@ -30,8 +30,11 @@ async function poll() {
   if (polling) return;
   polling = true;
   try {
+    const stored = await chrome.storage.local.get("chromeProfile");
+    const chromeProfile = String(stored.chromeProfile || "").trim();
     for (let index = 0; index < 5; index++) {
-      const response = await fetch(`${BRIDGE}/api/jobs/next`);
+      const query = chromeProfile ? `?chromeProfile=${encodeURIComponent(chromeProfile)}` : "";
+      const response = await fetch(`${BRIDGE}/api/jobs/next${query}`);
       if (!response.ok) break;
       const job = await response.json();
       if (!job?.id) break;

@@ -65,12 +65,12 @@ test("YouTube and TikTok start concurrently and retain independent matching hand
   };
   const manager = new UploadManager({
     state: new FakeState(),
-    resolveAccount: (platform, id) => ({ id, handle: "@ihooneez" }),
+    resolveAccount: (platform, id) => ({ id, handle: "@shared_account" }),
     uploaders: { youtube: uploader("youtube"), tiktok: uploader("tiktok") }
   });
   const pending = manager.upload({ ...base, destinations: [["youtube", "yt-main"], ["tiktok", "tt-main"]] });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(started, [["youtube", "@ihooneez"], ["tiktok", "@ihooneez"]]);
+  assert.deepEqual(started, [["youtube", "@shared_account"], ["tiktok", "@shared_account"]]);
   releases.youtube();
   releases.tiktok();
   const results = await pending;

@@ -15,7 +15,7 @@ test("preserves caption, line breaks, tags, mentions, and emoji", () => {
 test("canonicalizes Reel URLs for stable duplicate keys", () => {
   assert.equal(canonicalReelUrl("https://instagram.com/reel/ABC123?igsh=xyz"), "https://www.instagram.com/reel/ABC123/");
   assert.equal(canonicalReelUrl("https://www.instagram.com/reel/ABC123/"), "https://www.instagram.com/reel/ABC123/");
-  assert.equal(canonicalReelUrl("https://www.instagram.com/ihooneez/reel/ABC123/"), "https://www.instagram.com/reel/ABC123/");
+  assert.equal(canonicalReelUrl("https://www.instagram.com/creator_handle/reel/ABC123/"), "https://www.instagram.com/reel/ABC123/");
   assert.equal(canonicalReelUrl("https://example.com/video"), null);
 });
 

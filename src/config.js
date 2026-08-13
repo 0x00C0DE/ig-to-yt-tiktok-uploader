@@ -16,11 +16,43 @@ export function loadConfig(cwd = process.cwd()) {
   config.defaults.deepInstagramDiscovery ??= true;
   config.defaults.deleteAfterYouTubeUpload ??= true;
   config.defaults.instagramDiscoveryMethod ??= "extension";
+  config.chromeProfiles ??= {};
   config.downloader ??= {};
-  config.downloader.cookieBrowser ??= `chrome:${config.defaults.chromeProfileDirectory || "Default"}`;
+  const defaultChromeProfile = resolveChromeProfile(config);
+  config.downloader.cookieBrowser ??= `chrome:${defaultChromeProfile?.profileDirectory || config.defaults.chromeProfileDirectory || "Default"}`;
   config.accounts ??= {};
   for (const platform of ["instagram", "tiktok", "youtube"]) config.accounts[platform] ??= {};
   return config;
+}
+
+export function resolveChromeProfile(config, requestedId) {
+  const id = requestedId || config.defaults?.chromeProfile;
+  if (!id) {
+    const legacyDirectory = config.defaults?.chromeProfileDirectory;
+    return legacyDirectory
+      ? { id: null, label: legacyDirectory, profileDirectory: legacyDirectory }
+      : null;
+  }
+
+  const profiles = config.chromeProfiles || {};
+  const configured = profiles[id];
+  if (!configured) {
+    const choices = Object.keys(profiles).join(", ") || "none configured";
+    throw new Error(`Unknown Chrome profile '${id}'. Available: ${choices}`);
+  }
+
+  const profile = typeof configured === "string"
+    ? { profileDirectory: configured }
+    : configured;
+  const profileDirectory = profile.profileDirectory;
+  if (!profileDirectory || /[\\/]/.test(profileDirectory) || path.basename(profileDirectory) !== profileDirectory || [".", ".."].includes(profileDirectory)) {
+    throw new Error(`Chrome profile '${id}' must define a directory name such as 'Default' or 'Profile 2'`);
+  }
+  return {
+    id,
+    label: profile.label || id,
+    profileDirectory
+  };
 }
 
 export function requireAccount(config, platform, id) {

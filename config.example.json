@@ -1,4 +1,14 @@
 {
+  "chromeProfiles": {
+    "personal": {
+      "label": "Personal Chrome profile",
+      "profileDirectory": "Default"
+    },
+    "work": {
+      "label": "Work Chrome profile",
+      "profileDirectory": "Profile 2"
+    }
+  },
   "downloader": {
     "type": "direct",
     "command": "yt-dlp"
@@ -8,9 +18,9 @@
     "tiktok": {
       "tt-main": {
         "label": "Main TikTok",
-        "handle": "@ihooneez",
+        "handle": "@tiktok_handle",
         "uploadMethod": "tiktok-auto-uploader",
-        "sessionName": "ihooneez",
+        "sessionName": "tiktok-main",
         "uploaderPath": ".vendor/TiktokAutoUploader",
         "pythonCommand": "python",
         "visibility": 0,
@@ -20,7 +30,7 @@
       }
     },
     "youtube": {
-      "yt-main": { "label": "Main YouTube channel", "handle": "@ihooneez" }
+      "yt-main": { "label": "Main YouTube channel", "handle": "@youtube_handle" }
     }
   },
   "defaults": {
@@ -32,6 +42,6 @@
     "deepInstagramDiscovery": true,
     "deleteAfterYouTubeUpload": true,
     "instagramDiscoveryMethod": "extension",
-    "chromeProfileDirectory": "Profile 3"
+    "chromeProfile": "personal"
   }
 }
