@@ -17,6 +17,22 @@ Social Reel Bridge is intended for creators transferring Reels they own from an 
 
 The harness is a local CLI and Chrome extension, not a hosted service. It does not scrape private content the configured Instagram session cannot access and does not bypass platform authentication, CAPTCHA, copyright, or account-warning screens.
 
+## Demo
+
+These optimized, anonymized documentation copies are based on real local runs. The original full-resolution recordings remain outside the repository.
+
+### YouTube upload in the selected Chrome profile
+
+The extension opens YouTube Studio, assigns the downloaded Reel, preserves its mapped metadata, publishes it, and waits for upload confirmation.
+
+![Instagram Reel uploading to YouTube Studio](docs/demo/youtube-upload.gif)
+
+### Concurrent YouTube and TikTok workflow
+
+TikTokAutoUploader runs in the background, so its progress appears in the terminal instead of a TikTok Studio tab. The replay shows both destination confirmations, verified local cleanup, and progression to the next Reel.
+
+![Instagram Reel workflow confirming YouTube and TikTok publication](docs/demo/tiktok-upload.gif)
+
 ## Architecture and workflow
 
 ```mermaid
