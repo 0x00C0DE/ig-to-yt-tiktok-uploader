@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, requireAccount, resolveChromeProfile } from "../src/config.js";
+import { describeChromeProfile, loadConfig, requireAccount, resolveChromeProfile } from "../src/config.js";
 
 function config(accounts) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "reel-config-"));
@@ -93,4 +93,16 @@ test("an unknown Chrome profile reports the configured profile aliases", () => {
       /Unknown Chrome profile 'missing'.*personal/
     );
   } finally { fs.rmSync(cwd, { recursive: true, force: true }); }
+});
+
+test("describes named and legacy Chrome profiles without displaying a null alias", () => {
+  assert.equal(
+    describeChromeProfile({ id: "personal", profileDirectory: "Default" }),
+    "Chrome profile 'personal'"
+  );
+  assert.equal(
+    describeChromeProfile({ id: null, profileDirectory: "Profile 3" }),
+    "Chrome profile directory 'Profile 3'"
+  );
+  assert.equal(describeChromeProfile(null), "the current Chrome session");
 });

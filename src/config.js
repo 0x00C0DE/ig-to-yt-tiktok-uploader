@@ -55,6 +55,12 @@ export function resolveChromeProfile(config, requestedId) {
   };
 }
 
+export function describeChromeProfile(profile) {
+  if (profile?.id) return `Chrome profile '${profile.id}'`;
+  if (profile?.profileDirectory) return `Chrome profile directory '${profile.profileDirectory}'`;
+  return "the current Chrome session";
+}
+
 export function requireAccount(config, platform, id) {
   const account = config.accounts?.[platform]?.[id];
   if (!account) {

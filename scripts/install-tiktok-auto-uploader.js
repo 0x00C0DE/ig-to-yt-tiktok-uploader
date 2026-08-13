@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { resolveNodePackageManagerCommand } from "../src/command.js";
 
 process.on("uncaughtException", (error) => {
   console.error(`TikTokAutoUploader installation failed: ${error.message}`);
@@ -12,8 +13,8 @@ const REVISION = "d29b4366edf0de705e87f265298a06b64a00d7dc";
 const cwd = process.cwd();
 const target = path.join(cwd, ".vendor", "TiktokAutoUploader");
 const python = process.env.TIKTOK_PYTHON || "python";
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+const npm = resolveNodePackageManagerCommand("npm");
+const npx = resolveNodePackageManagerCommand("npx");
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: options.cwd || cwd, stdio: "inherit", shell: false });
@@ -53,6 +54,6 @@ if (!patchApplied) {
 
 run(python, ["-m", "pip", "install", "-r", path.join(cwd, "requirements-tiktok-auto-uploader.txt")]);
 const signature = path.join(target, "tiktok_uploader", "tiktok-signature");
-run(npm, ["install"], { cwd: signature });
-run(npx, ["playwright", "install", "chromium"], { cwd: signature });
+run(npm.command, [...npm.args, "install"], { cwd: signature });
+run(npx.command, [...npx.args, "playwright", "install", "chromium"], { cwd: signature });
 console.log(`TikTokAutoUploader ${REVISION.slice(0, 12)} installed at ${target}`);
