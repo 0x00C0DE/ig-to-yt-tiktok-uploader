@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Social Reel Bridge architecture</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0d1117;
+      color: #f0f6fc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0d1117;
+    }
+
+    main {
+      width: min(100% - 32px, 1500px);
+      margin: 0 auto;
+      padding: 24px 0 36px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+    }
+
+    .instructions {
+      margin: 0 0 16px;
+      color: #b1bac4;
+      line-height: 1.55;
+    }
+
+    kbd {
+      padding: 2px 6px;
+      border: 1px solid #484f58;
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      background: #21262d;
+      color: #f0f6fc;
+      font: inherit;
+      font-size: .9em;
+    }
+
+    #diagram-viewport {
+      position: relative;
+      min-height: 520px;
+      overflow: hidden;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      outline: none;
+      background:
+        radial-gradient(circle at 50% 45%, rgb(33 38 45 / 45%), transparent 48%),
+        #0d1117;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+
+    #diagram-viewport:focus-visible {
+      box-shadow: 0 0 0 3px #1f6feb;
+    }
+
+    #diagram-viewport.dragging { cursor: grabbing; }
+
+    #architecture-diagram {
+      display: block;
+      width: 100%;
+      min-width: 900px;
+      height: 520px;
+    }
+
+    .edge {
+      fill: none;
+      stroke: #8c959f;
+      stroke-width: 2;
+      marker-end: url(#arrow);
+    }
+
+    .node rect {
+      fill: #161b22;
+      stroke: #8c959f;
+      stroke-width: 2;
+      rx: 2;
+    }
+
+    .node text {
+      fill: #f0f6fc;
+      font-size: 17px;
+      font-weight: 600;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+    }
+
+    #diagram-controls {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(3, 44px);
+      grid-template-rows: repeat(3, 44px);
+      gap: 4px;
+      padding: 5px;
+      border: 1px solid #484f58;
+      border-radius: 10px;
+      background: rgb(13 17 23 / 92%);
+      box-shadow: 0 8px 28px rgb(0 0 0 / 35%);
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 120ms ease, transform 120ms ease;
+      pointer-events: none;
+    }
+
+    #diagram-viewport.controls-visible #diagram-controls,
+    #diagram-controls:focus-within,
+    #diagram-controls:hover {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .control {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: 1px solid #484f58;
+      border-radius: 7px;
+      background: #21262d;
+      color: #f0f6fc;
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .control:hover,
+    .control:focus-visible {
+      border-color: #58a6ff;
+      background: #30363d;
+      outline: none;
+    }
+
+    [data-action="up"] { grid-column: 2; grid-row: 1; }
+    [data-action="zoom-in"] { grid-column: 3; grid-row: 1; }
+    [data-action="left"] { grid-column: 1; grid-row: 2; }
+    [data-action="reset"] { grid-column: 2; grid-row: 2; }
+    [data-action="right"] { grid-column: 3; grid-row: 2; }
+    [data-action="down"] { grid-column: 2; grid-row: 3; }
+    [data-action="zoom-out"] { grid-column: 3; grid-row: 3; }
+
+    #zoom-status {
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      margin: 0;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: rgb(13 17 23 / 82%);
+      color: #b1bac4;
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 720px) {
+      main { width: min(100% - 16px, 1500px); padding-top: 14px; }
+      #diagram-viewport { min-height: 460px; }
+      #architecture-diagram { height: 460px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #diagram-controls { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Social Reel Bridge architecture</h1>
+    <p class="instructions">
+      Drag anywhere on the diagram to pan. Hold <kbd>Ctrl</kbd> while scrolling to zoom at the pointer,
+      or point at the diagram and use <kbd>Ctrl</kbd> + <kbd>+</kbd>, <kbd>-</kbd>, or <kbd>0</kbd>.
+      The control pad follows the cursor and is fully keyboard accessible.
+    </p>
+
+    <div id="diagram-viewport" tabindex="0" role="application" aria-label="Interactive Social Reel Bridge architecture diagram">
+      <svg id="architecture-diagram" viewBox="0 0 1740 520" role="img" aria-labelledby="diagram-title diagram-description">
+        <title id="diagram-title">Social Reel Bridge architecture and workflow</title>
+        <desc id="diagram-description">Instagram Reel discovery and metadata extraction feed the upload manager, which dispatches to YouTube or one of three TikTok adapters before recording independent ledger results.</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#8c959f"></path>
+          </marker>
+        </defs>
+
+        <g id="diagram-scene">
+          <path class="edge" d="M240 260 H280"></path>
+          <path class="edge" d="M450 260 H490"></path>
+          <path class="edge" d="M740 260 H780"></path>
+          <path class="edge" d="M1000 260 H1040"></path>
+
+          <path class="edge" d="M1220 260 C1240 260 1240 70 1270 70"></path>
+          <path class="edge" d="M1220 260 C1240 260 1240 190 1270 190"></path>
+          <path class="edge" d="M1220 260 C1240 260 1240 310 1270 310"></path>
+          <path class="edge" d="M1220 260 C1240 260 1240 430 1270 430"></path>
+
+          <path class="edge" d="M1500 70 C1520 70 1520 260 1540 260"></path>
+          <path class="edge" d="M1500 190 C1520 190 1520 260 1540 260"></path>
+          <path class="edge" d="M1500 310 C1520 310 1520 260 1540 260"></path>
+          <path class="edge" d="M1500 430 C1520 430 1520 260 1540 260"></path>
+
+          <g class="node">
+            <rect x="30" y="215" width="210" height="90"></rect>
+            <text x="135" y="249"><tspan x="135">Instagram handle in</tspan><tspan x="135" dy="23">selected Chrome profile</tspan></text>
+          </g>
+          <g class="node">
+            <rect x="280" y="220" width="170" height="80"></rect>
+            <text x="365" y="260">Reel discovery</text>
+          </g>
+          <g class="node">
+            <rect x="490" y="215" width="250" height="90"></rect>
+            <text x="615" y="249"><tspan x="615">yt-dlp media and</tspan><tspan x="615" dy="23">metadata extraction</tspan></text>
+          </g>
+          <g class="node">
+            <rect x="780" y="215" width="220" height="90"></rect>
+            <text x="890" y="249"><tspan x="890">Platform metadata</tspan><tspan x="890" dy="23">adapters</tspan></text>
+          </g>
+          <g class="node">
+            <rect x="1040" y="220" width="180" height="80"></rect>
+            <text x="1130" y="260">UploadManager</text>
+          </g>
+
+          <g class="node">
+            <rect x="1270" y="25" width="230" height="90"></rect>
+            <text x="1385" y="70">YouTube Chrome extension</text>
+          </g>
+          <g class="node">
+            <rect x="1270" y="145" width="230" height="90"></rect>
+            <text x="1385" y="179"><tspan x="1385">TikTokAutoUploader</tspan><tspan x="1385" dy="23">session adapter</tspan></text>
+          </g>
+          <g class="node">
+            <rect x="1270" y="265" width="230" height="90"></rect>
+            <text x="1385" y="299"><tspan x="1385">TikTok official API</tspan><tspan x="1385" dy="23">adapter</tspan></text>
+          </g>
+          <g class="node">
+            <rect x="1270" y="385" width="230" height="90"></rect>
+            <text x="1385" y="419"><tspan x="1385">TikTok Chrome extension</tspan><tspan x="1385" dy="23">adapter</tspan></text>
+          </g>
+          <g class="node">
+            <rect x="1540" y="215" width="170" height="90"></rect>
+            <text x="1625" y="249"><tspan x="1625">Independent TSV</tspan><tspan x="1625" dy="23">ledger rows</tspan></text>
+          </g>
+        </g>
+      </svg>
+
+      <div id="diagram-controls" role="toolbar" aria-label="Diagram navigation controls">
+        <button class="control" type="button" data-action="up" aria-label="Pan up" title="Pan up">↑</button>
+        <button class="control" type="button" data-action="zoom-in" aria-label="Zoom in" title="Zoom in (Ctrl + +)">＋</button>
+        <button class="control" type="button" data-action="left" aria-label="Pan left" title="Pan left">←</button>
+        <button class="control" type="button" data-action="reset" aria-label="Reset view" title="Reset view (Ctrl + 0)">↻</button>
+        <button class="control" type="button" data-action="right" aria-label="Pan right" title="Pan right">→</button>
+        <button class="control" type="button" data-action="down" aria-label="Pan down" title="Pan down">↓</button>
+        <button class="control" type="button" data-action="zoom-out" aria-label="Zoom out" title="Zoom out (Ctrl + -)">−</button>
+      </div>
+
+      <p id="zoom-status" aria-live="polite">Zoom: 100%</p>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const viewport = document.querySelector('#diagram-viewport');
+      const svg = document.querySelector('#architecture-diagram');
+      const scene = document.querySelector('#diagram-scene');
+      const controls = document.querySelector('#diagram-controls');
+      const status = document.querySelector('#zoom-status');
+
+      const MIN_SCALE = 0.45;
+      const MAX_SCALE = 4;
+      const KEYBOARD_ZOOM = 1.2;
+      const PAN_STEP = 70;
+      let scale = 1;
+      let translateX = 0;
+      let translateY = 0;
+      let pointerInside = false;
+      let dragPointerId = null;
+      let previousPoint = null;
+
+      function clamp(value, minimum, maximum) {
+        return Math.min(maximum, Math.max(minimum, value));
+      }
+
+      function clientToSvg(clientX, clientY) {
+        const point = new DOMPoint(clientX, clientY);
+        return point.matrixTransform(svg.getScreenCTM().inverse());
+      }
+
+      function render() {
+        scene.setAttribute('transform', `translate(${translateX} ${translateY}) scale(${scale})`);
+        status.textContent = `Zoom: ${Math.round(scale * 100)}%`;
+      }
+
+      function viewportCenter() {
+        const bounds = viewport.getBoundingClientRect();
+        return clientToSvg(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+      }
+
+      function zoomAt(nextScale, origin) {
+        nextScale = clamp(nextScale, MIN_SCALE, MAX_SCALE);
+        const diagramX = (origin.x - translateX) / scale;
+        const diagramY = (origin.y - translateY) / scale;
+        translateX = origin.x - diagramX * nextScale;
+        translateY = origin.y - diagramY * nextScale;
+        scale = nextScale;
+        render();
+      }
+
+      function reset() {
+        scale = 1;
+        translateX = 0;
+        translateY = 0;
+        render();
+      }
+
+      function moveControls(clientX, clientY) {
+        const bounds = viewport.getBoundingClientRect();
+        const width = controls.offsetWidth || 152;
+        const height = controls.offsetHeight || 152;
+        const x = clamp(clientX - bounds.left + 18, 8, bounds.width - width - 8);
+        const y = clamp(clientY - bounds.top + 18, 8, bounds.height - height - 8);
+        controls.style.left = `${x}px`;
+        controls.style.top = `${y}px`;
+      }
+
+      viewport.addEventListener('pointerenter', (event) => {
+        pointerInside = true;
+        viewport.classList.add('controls-visible');
+        moveControls(event.clientX, event.clientY);
+      });
+
+      viewport.addEventListener('pointerleave', () => {
+        pointerInside = false;
+        if (!controls.matches(':hover') && !controls.contains(document.activeElement)) {
+          viewport.classList.remove('controls-visible');
+        }
+      });
+
+      viewport.addEventListener('pointermove', (event) => {
+        if (dragPointerId === event.pointerId && previousPoint) {
+          const currentPoint = clientToSvg(event.clientX, event.clientY);
+          translateX += currentPoint.x - previousPoint.x;
+          translateY += currentPoint.y - previousPoint.y;
+          previousPoint = currentPoint;
+          render();
+          return;
+        }
+
+        if (!event.target.closest('#diagram-controls')) {
+          moveControls(event.clientX, event.clientY);
+        }
+      });
+
+      viewport.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0 || event.target.closest('#diagram-controls')) return;
+        viewport.focus({ preventScroll: true });
+        dragPointerId = event.pointerId;
+        previousPoint = clientToSvg(event.clientX, event.clientY);
+        viewport.setPointerCapture(event.pointerId);
+        viewport.classList.add('dragging');
+      });
+
+      function finishDrag(event) {
+        if (dragPointerId !== event.pointerId) return;
+        dragPointerId = null;
+        previousPoint = null;
+        viewport.classList.remove('dragging');
+        if (viewport.hasPointerCapture(event.pointerId)) {
+          viewport.releasePointerCapture(event.pointerId);
+        }
+      }
+
+      viewport.addEventListener('pointerup', finishDrag);
+      viewport.addEventListener('pointercancel', finishDrag);
+
+      viewport.addEventListener('wheel', (event) => {
+        if (!event.ctrlKey) return;
+        event.preventDefault();
+        const factor = Math.exp(-event.deltaY * 0.002);
+        zoomAt(scale * factor, clientToSvg(event.clientX, event.clientY));
+      }, { passive: false });
+
+      document.addEventListener('keydown', (event) => {
+        const diagramActive = pointerInside || viewport.contains(document.activeElement) || document.activeElement === viewport;
+        if (!diagramActive || !event.ctrlKey || event.altKey || event.metaKey) return;
+
+        const isPlus = event.key === '+' || event.code === 'Equal' || event.code === 'NumpadAdd';
+        const isMinus = event.key === '-' || event.code === 'Minus' || event.code === 'NumpadSubtract';
+        const isReset = event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0';
+        if (!isPlus && !isMinus && !isReset) return;
+
+        event.preventDefault();
+        if (isReset) reset();
+        if (isPlus) zoomAt(scale * KEYBOARD_ZOOM, viewportCenter());
+        if (isMinus) zoomAt(scale / KEYBOARD_ZOOM, viewportCenter());
+      });
+
+      controls.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-action]');
+        if (!button) return;
+        const action = button.dataset.action;
+        if (action === 'up') translateY += PAN_STEP;
+        if (action === 'down') translateY -= PAN_STEP;
+        if (action === 'left') translateX += PAN_STEP;
+        if (action === 'right') translateX -= PAN_STEP;
+        if (action === 'zoom-in') zoomAt(scale * KEYBOARD_ZOOM, viewportCenter());
+        if (action === 'zoom-out') zoomAt(scale / KEYBOARD_ZOOM, viewportCenter());
+        if (action === 'reset') reset();
+        render();
+      });
+
+      controls.addEventListener('pointerenter', () => viewport.classList.add('controls-visible'));
+      controls.addEventListener('pointerleave', () => {
+        if (!pointerInside && !controls.contains(document.activeElement)) {
+          viewport.classList.remove('controls-visible');
+        }
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

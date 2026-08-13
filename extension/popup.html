@@ -1,3 +1,3 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><style>body{font:14px system-ui;width:260px;padding:12px}button{width:100%;padding:8px}#status{margin-top:10px}</style></head>
-<body><strong>Social Reel Bridge</strong><p>Start the local harness, then connect.</p><button id="connect">Check for upload</button><div id="status"></div><script src="popup.js"></script></body></html>
+<html><head><meta charset="utf-8"><style>body{font:14px system-ui;width:280px;padding:12px}label{display:block;margin:10px 0 4px;font-weight:600}input,button{box-sizing:border-box;width:100%;padding:8px}button{margin-top:8px}#status{margin-top:10px;line-height:1.35}</style></head>
+<body><strong>Social Reel Bridge</strong><p>Use the alias assigned to this Chrome profile in <code>config.json</code>.</p><label for="chrome-profile">Chrome profile alias</label><input id="chrome-profile" type="text" placeholder="personal" autocomplete="off"><button id="connect">Save and check for upload</button><div id="status"></div><script src="popup.js" type="module"></script></body></html>

@@ -19,9 +19,13 @@ The harness is a local CLI and Chrome extension, not a hosted service. It does n
 
 ## Architecture and workflow
 
+For cursor-based navigation, open the [interactive architecture viewer](docs/architecture.html) from a local clone. Its control pad follows the pointer, the diagram can be dragged to pan, and zoom is scoped to the diagram when using **Ctrl + mouse wheel**, **Ctrl + +**, **Ctrl + -**, or **Ctrl + 0**. Click or point at the diagram before using the keyboard shortcuts.
+
+> GitHub renders README content in a security sandbox that does not allow Markdown to register custom mouse or keyboard handlers. The Mermaid diagram below is therefore the accessible static fallback; the linked, self-contained viewer provides the requested interaction without loading external scripts.
+
 ```mermaid
 flowchart LR
-    IG["Instagram handle in current Chrome session"] --> D["Reel discovery"]
+    IG["Instagram handle in selected Chrome profile"] --> D["Reel discovery"]
     D --> M["yt-dlp media and metadata extraction"]
     M --> A["Platform metadata adapters"]
     A --> U["UploadManager"]
@@ -64,16 +68,43 @@ config.example.json          Secret-free account/configuration template
 
 ## Install the Chrome extension (recommended uploader)
 
-1. Open Profile 3 (`다훈`) in normal Google Chrome.
+1. Open the Google Chrome profile you want the harness to use.
 2. Navigate to `chrome://extensions`.
 3. Enable **Developer mode**.
 4. Choose **Load unpacked**.
 5. Select the project's `extension` folder.
 6. Pin **Social Reel Bridge** to the Chrome toolbar.
+7. Open the extension, enter the logical profile alias assigned to this profile in `config.json` (for example, `personal`), and choose **Save and check for upload**.
 
-With `defaults.uploadMethod` set to `extension`, the local harness never launches a destination browser. The extension uses the currently running and logged-in Chrome profile. The harness listens only on `127.0.0.1:43117`, serves the current video to the extension, and stops the server when the run finishes. If Chrome does not open an upload tab within 30 seconds, click the extension icon and choose **Check for upload**.
+After pulling an extension update, return to `chrome://extensions` and choose **Reload** for Social Reel Bridge in each configured Chrome profile.
 
-With `defaults.instagramDiscoveryMethod` set to `extension`, profile discovery also runs in that same active Chrome profile. The extension opens the Instagram Reels page, uses the profile's existing Instagram login, scrolls the page, and returns canonical Reel URLs to the harness. No separate Playwright Chrome profile is opened for discovery.
+Repeat these steps in every Chrome profile you want to make selectable, using a unique logical alias in each extension popup. With `defaults.uploadMethod` set to `extension`, the local harness never launches a destination browser. It sends each job only to the extension instance whose saved alias matches the selected profile. The harness listens only on `127.0.0.1:43117`, serves the current video to the extension, and stops the server when the run finishes. If Chrome does not open an upload tab within 30 seconds, open the selected profile, click the extension icon, and choose **Save and check for upload**.
+
+With `defaults.instagramDiscoveryMethod` set to `extension`, profile discovery runs in the selected Chrome profile. The extension opens the Instagram Reels page, uses that profile's existing Instagram login, scrolls the page, and returns canonical Reel URLs to the harness. No separate Playwright Chrome profile is opened for discovery.
+
+Define logical aliases and their corresponding Chrome profile directories in `config.json`:
+
+```json
+{
+  "chromeProfiles": {
+    "personal": { "label": "Personal browser", "profileDirectory": "Default" },
+    "work": { "label": "Work browser", "profileDirectory": "Profile 2" }
+  },
+  "defaults": {
+    "chromeProfile": "personal"
+  }
+}
+```
+
+`chromeProfile` is the logical alias stored by the extension and selected by the harness. `profileDirectory` is Chrome's on-disk directory name and is used only by cookie extraction and the optional direct-browser fallback. Find the current directory at `chrome://version` under **Profile Path**; use only its final directory component, such as `Default` or `Profile 2`.
+
+Override the default for any `setup`, `transfer`, or `sync` run:
+
+```powershell
+node src/cli.js sync --handle "@source_handle" --youtube yt-main --chrome-profile work --mode publish
+```
+
+The extension does not switch Chrome profiles itself. The matching Chrome profile must be open, have the unpacked extension installed, and have the same logical alias saved in its extension popup. Other profiles can remain open; they will not claim a job addressed to `work`.
 
 The extension uses TikTok's ordinary file-change flow for compatibility with TikTok Studio. For YouTube, it uses Chrome's `debugger` permission only long enough to assign the downloaded local MP4 to YouTube's native hidden file input, then immediately detaches. Chrome may briefly display a developer-tools control banner during YouTube file assignment.
 
@@ -85,20 +116,20 @@ The optional `tiktok-auto-uploader` adapter invokes the immediate-upload and loc
 
 TikTokAutoUploader is unofficial and uses TikTok web endpoints. TikTok can change or reject those endpoints, expire a stored session, rate-limit an account, or take action against automated use. Use it only for accounts and media you control. Its session cookies are credentials and must not be shared.
 
-YouTube and TikTok accounts remain separate even when both public handles are `@ihooneez`:
+YouTube and TikTok accounts remain separate even when both public handles are the same:
 
 ```json
 {
   "accounts": {
     "youtube": {
-      "yt-main": { "handle": "@ihooneez", "label": "Main YouTube channel" }
+      "yt-main": { "handle": "@creator_handle", "label": "Main YouTube channel" }
     },
     "tiktok": {
       "tt-main": {
-        "handle": "@ihooneez",
+        "handle": "@creator_handle",
         "label": "Main TikTok profile",
         "uploadMethod": "tiktok-auto-uploader",
-        "sessionName": "ihooneez",
+        "sessionName": "creator-tiktok",
         "uploaderPath": ".vendor/TiktokAutoUploader",
         "pythonCommand": "python"
       }
@@ -158,7 +189,7 @@ Every TikTok alias has its own `sessionName`; run setup once for each alias. If 
 
 ### Chrome extension and direct-browser sessions
 
-With `defaults.uploadMethod` set to `extension`, the extension uses whichever TikTok and YouTube accounts are already signed into the Chrome profile where the unpacked extension is installed. Destination aliases and `handle` values control configuration, logging, and ledger identity; the MVP does not switch or cryptographically verify the active YouTube/TikTok web account. Confirm the visible account before unattended publishing.
+With `defaults.uploadMethod` set to `extension`, the extension uses the TikTok and YouTube accounts already signed into the selected Chrome profile. Destination aliases and `handle` values control configuration, logging, and ledger identity; selecting a Chrome profile routes the browser job but does not cryptographically verify the active YouTube/TikTok web account. Confirm the visible account in each configured profile before unattended publishing.
 
 The optional direct Playwright fallback uses separate persistent sessions and can be initialized with:
 
@@ -205,19 +236,19 @@ Choose any configured source and destination aliases. Omit `--tiktok` or `--yout
 YouTube only:
 
 ```powershell
-node src/cli.js sync --handle "@ihooneez" --instagram ig-source --youtube yt-main --platforms youtube --mode publish
+node src/cli.js sync --handle "@source_handle" --instagram ig-source --youtube yt-main --platforms youtube --mode publish
 ```
 
 TikTokAutoUploader only:
 
 ```powershell
-node src/cli.js sync --handle "@ihooneez" --instagram ig-source --tiktok tt-main --platforms tiktok --mode publish
+node src/cli.js sync --handle "@source_handle" --instagram ig-source --tiktok tt-main --platforms tiktok --mode publish
 ```
 
 YouTube and TikTok concurrently for each Reel:
 
 ```powershell
-node src/cli.js sync --handle "@ihooneez" --instagram ig-source --youtube yt-main --tiktok tt-main --platforms youtube,tiktok --mode publish
+node src/cli.js sync --handle "@source_handle" --instagram ig-source --youtube yt-main --tiktok tt-main --platforms youtube,tiktok --mode publish
 ```
 
 The upload manager starts both selected adapters concurrently. It waits for both results before moving to the next Reel, but a TikTok failure does not cancel a YouTube upload and a YouTube failure does not erase a successful TikTok result. Each result is recorded in its own ledger row. A downloaded file is deleted only after YouTube and every selected destination have completed successfully.
@@ -244,9 +275,9 @@ Use `--platforms youtube` or `--platforms tiktok` to temporarily enable only one
 
 If the process is interrupted or an uploader errors, that destination is retried on the next run. Because browser pages cannot provide true idempotency keys, a platform that publishes successfully but fails to show a recognizable confirmation could be retried; check account history if that unusual case occurs.
 
-With the default `instagramDiscoveryMethod: "extension"`, discovery uses the current Chrome profile and its existing Instagram session. In direct-browser fallback mode, omitting `--instagram` uses a temporary logged-out browser; private or login-blocked sources then require a configured Instagram alias.
+With the default `instagramDiscoveryMethod: "extension"`, discovery uses the selected Chrome profile and its existing Instagram session. In direct-browser fallback mode, omitting `--instagram` and profile selection uses a temporary logged-out browser; private or login-blocked sources then require a configured Instagram alias or a selected Chrome profile.
 
-The temporary fallback discovery browser runs headlessly and is not shown. Chrome-extension uploads use the already-running Chrome profile; direct Playwright uploads use sessions stored beneath `.sessions/`.
+The temporary fallback discovery browser runs headlessly and is not shown. Chrome-extension uploads use the already-running selected Chrome profile; direct Playwright uploads use sessions stored beneath `.sessions/`, including one-time automation copies of explicitly selected Chrome directories.
 
 Deep discovery uses Instaloader profile pagination before falling back to the visible Instagram grid. Install it with `python -m pip install instaloader`. This allows discovery beyond the 12-tile logged-out preview when Instagram permits anonymous pagination. If Instagram rate-limits anonymous pagination, the harness now fails explicitly instead of incorrectly treating 12 Reels as the complete profile. A later retry, an authenticated Instagram source session, or a configured third-party discovery provider may still be required because the harness cannot override Instagram's server-side access limit.
 
@@ -260,7 +291,7 @@ Deep discovery uses Instaloader profile pagination before falling back to the vi
 
 ## Known MVP limitations
 
-- Chrome-extension account aliases do not switch or verify the active YouTube/TikTok website account; the signed-in Chrome profile is authoritative.
+- Chrome-profile aliases route extension jobs but do not switch or verify the active YouTube/TikTok website account inside that profile; the signed-in web account is authoritative.
 - Instagram, TikTok, and YouTube page structures and unofficial web endpoints can change without notice.
 - A platform may accept a post but fail to show a recognizable confirmation. In that ambiguous case the ledger remains retryable; check platform history before rerunning to avoid a duplicate.
 - TikTokAutoUploader immediate uploads require Python 3.9+, its pinned dependencies, its signature Chromium, and a locally saved TikTok session.

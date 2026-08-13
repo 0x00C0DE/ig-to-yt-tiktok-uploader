@@ -6,6 +6,12 @@ import crypto from "node:crypto";
 const HOST = "127.0.0.1";
 const PORT = 43117;
 
+export function selectQueuedJob(jobs, chromeProfile) {
+  return jobs.find((item) =>
+    item.status === "queued" && (!item.chromeProfile || item.chromeProfile === chromeProfile)
+  );
+}
+
 function json(response, status, value) {
   response.writeHead(status, {
     "Content-Type": "application/json",
@@ -17,7 +23,11 @@ function json(response, status, value) {
 }
 
 export class ExtensionBridge {
-  constructor() { this.jobs = new Map(); this.server = null; }
+  constructor({ chromeProfile = null } = {}) {
+    this.chromeProfile = chromeProfile;
+    this.jobs = new Map();
+    this.server = null;
+  }
 
   async start() {
     if (this.server) return;
@@ -38,7 +48,7 @@ export class ExtensionBridge {
     const id = crypto.randomUUID();
     const job = {
       id, platform, videoPath: videoPath || null,
-      filename: videoPath ? path.basename(videoPath) : null,
+      filename: videoPath ? path.basename(videoPath) : null, chromeProfile: this.chromeProfile,
       metadata, mode, status: "queued", message: "", result: null
     };
     this.jobs.set(id, job);
@@ -60,7 +70,11 @@ export class ExtensionBridge {
       const timer = setInterval(() => {
         if (["prepared", "completed"].includes(job.status)) { clearInterval(timer); resolve(job); }
         else if (job.status === "failed") { clearInterval(timer); reject(new Error(job.message || "Extension upload failed")); }
-        else if (Date.now() > deadline) { clearInterval(timer); reject(new Error("Timed out waiting for the Chrome extension. Click its toolbar icon and choose Check for upload.")); }
+        else if (Date.now() > deadline) {
+          clearInterval(timer);
+          const profileHint = job.chromeProfile ? ` configured as '${job.chromeProfile}'` : "";
+          reject(new Error(`Timed out waiting for the Chrome extension${profileHint}. Open that Chrome profile, click the extension icon, and choose Check for upload.`));
+        }
       }, 500);
     });
   }
@@ -68,9 +82,12 @@ export class ExtensionBridge {
   async handle(request, response) {
     if (request.method === "OPTIONS") return json(response, 204, {});
     const url = new URL(request.url, `http://${HOST}:${PORT}`);
-    if (url.pathname === "/health") return json(response, 200, { ok: true });
+    if (url.pathname === "/health") {
+      return json(response, 200, { ok: true, chromeProfile: this.chromeProfile });
+    }
     if (url.pathname === "/api/jobs/next") {
-      const job = [...this.jobs.values()].find((item) => item.status === "queued");
+      const requestedProfile = url.searchParams.get("chromeProfile");
+      const job = selectQueuedJob([...this.jobs.values()], requestedProfile);
       if (!job) return json(response, 200, {});
       job.status = "claimed";
       return json(response, 200, { id: job.id, platform: job.platform });
