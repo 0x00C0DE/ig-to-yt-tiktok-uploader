@@ -299,6 +299,8 @@ The upload manager starts both selected adapters concurrently. It waits for both
 
 For the `tiktok-auto-uploader` method, `Starting upload...` means the background Python adapter has started. No TikTok Studio tab is expected. Completion is recorded only after that process confirms publication; a timeout or error leaves the TikTok ledger row retryable.
 
+If TikTok's upload-initialization response omits its required upload endpoint, the adapter validates the response and retries up to two additional times. Each retry uses a fresh HTTP session populated with the current authenticated cookies, headers, and proxy settings. After three unusable responses, the upload remains retryable in the ledger and `sync` advances to the next Reel.
+
 ## State, errors, retries, and cleanup
 
 The harness records each source/destination combination in the Notepad-friendly `state/ledger.tsv`. Only a destination whose `status` column is `completed` is skipped. `started`, `retry`, `failed`, and `needs_review` destinations are retried on the next run. For each Reel, the harness waits until every selected destination has returned a result. It then advances even when one destination failed, retaining that failed row and its downloaded media for a later retry.
@@ -367,6 +369,7 @@ Deep discovery uses Instaloader profile pagination before falling back to the vi
 - **Signature/Chromium failure:** from `.vendor/TiktokAutoUploader/tiktok_uploader/tiktok-signature`, run `npm.cmd install` and `npx.cmd playwright install chromium`.
 - **TikTok rejects the upload:** the ledger keeps TikTok in `needs_review` while retaining an independently successful YouTube result. Review the platform-aware terminal error before retrying.
 - **`list index out of range` while parsing a caption:** the adapter now preserves an unresolved TikTok `@mention` as plain caption text instead of crashing when TikTok's user lookup omits its expected page marker.
+- **`list index out of range` immediately after `Uploading video...`:** the upstream uploader received no usable upload endpoint from TikTok. The adapter now validates that response and retries with fresh authenticated sessions instead of indexing an empty list.
 - **Unsupported video:** the adapter accepts MP4, MOV, and WEBM files and rejects missing or unsupported inputs before starting an external process.
 
 ## Tests

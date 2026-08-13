@@ -42,7 +42,10 @@ def main() -> int:
             Config.load(config_path)
         from tiktok_uploader import tiktok
         from tiktok_caption import convert_tags_resilient
+        from tiktok_upload_retry import build_upload_initializer_with_retry
         tiktok.convert_tags = convert_tags_resilient
+        if callable(getattr(tiktok, "upload_to_tiktok", None)):
+            tiktok.upload_to_tiktok = build_upload_initializer_with_retry(tiktok.upload_to_tiktok)
     except Exception as error:
         print(f"TikTokAutoUploader dependency/import failure: {error}", file=sys.stderr)
         return 3
