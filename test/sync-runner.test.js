@@ -23,7 +23,7 @@ test("a destination failure is counted and the next Reel is still processed", as
   });
 
   assert.deepEqual(attempted, ["reel-one", "reel-two", "reel-three"]);
-  assert.deepEqual(summary, { completed: 1, skipped: 1, failed: 1, inaccessible: 0 });
+  assert.deepEqual(summary, { completed: 1, skipped: 1, failed: 1, inaccessible: 0, extractionFailed: 0 });
   assert.match(warnings[0], /tiktok\/tt-main.*continuing/i);
 });
 
@@ -50,5 +50,28 @@ test("inaccessible Reels retain their existing skip-and-continue behavior", asyn
   });
 
   assert.deepEqual(unavailable, ["blocked"]);
-  assert.deepEqual(summary, { completed: 1, skipped: 0, failed: 0, inaccessible: 1 });
+  assert.deepEqual(summary, { completed: 1, skipped: 0, failed: 0, inaccessible: 1, extractionFailed: 0 });
+});
+
+test("recoverable Reel extraction failures are retained for retry and do not stop the batch", async () => {
+  const attempted = [];
+  const retryable = [];
+  const warnings = [];
+  const summary = await processReelSequence({
+    reels: ["timed-out", "accessible"],
+    processReel: async (reel) => {
+      attempted.push(reel);
+      if (reel === "timed-out") throw new Error("Could not read Reel metadata: curl: (28) Connection timed out");
+      return { skipped: false, failures: [] };
+    },
+    isUnavailable: () => false,
+    isRecoverable: (error) => /timed out/.test(error.message),
+    markRecoverable: async (reel, error) => retryable.push({ reel, error: error.message }),
+    logger: { log() {}, warn(message) { warnings.push(message); } }
+  });
+
+  assert.deepEqual(attempted, ["timed-out", "accessible"]);
+  assert.equal(retryable[0].reel, "timed-out");
+  assert.deepEqual(summary, { completed: 1, skipped: 0, failed: 0, inaccessible: 0, extractionFailed: 1 });
+  assert.match(warnings[0], /extraction failed.*continuing/i);
 });

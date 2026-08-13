@@ -82,6 +82,10 @@ export class TransferState {
     this.set(sourceAccount, reelUrl, platform, destinationAccount, "needs_review", String(error?.message || error));
   }
 
+  retry(sourceAccount, reelUrl, platform, destinationAccount, error) {
+    this.set(sourceAccount, reelUrl, platform, destinationAccount, "retry", String(error?.message || error));
+  }
+
   unavailable(sourceAccount, reelUrl, platform, destinationAccount, error) {
     this.set(sourceAccount, reelUrl, platform, destinationAccount, "unavailable", String(error?.message || error));
   }

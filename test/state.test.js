@@ -18,3 +18,16 @@ test("only verified completion is skippable", () => {
   assert.equal(new TransferState(cwd).isClaimed(...args), true);
   fs.rmSync(cwd, { recursive: true, force: true });
 });
+
+test("Reel extraction failures remain retryable for every incomplete destination", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "reel-extraction-state-"));
+  const args = ["ig-source", "https://www.instagram.com/reel/RETRY123/", "tiktok", "tt-main"];
+  const state = new TransferState(cwd);
+  state.retry(...args, new Error("metadata connection timed out"));
+
+  const reloaded = new TransferState(cwd);
+  assert.equal(reloaded.status(...args), "retry");
+  assert.equal(reloaded.has(...args), false);
+  assert.match(reloaded.record(...args).note, /timed out/);
+  fs.rmSync(cwd, { recursive: true, force: true });
+});

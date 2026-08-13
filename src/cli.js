@@ -6,7 +6,7 @@ import { describeChromeProfile, loadConfig, requireAccount, resolveChromeProfile
 import { openAccountBrowser, openPublicBrowser, pauseForLogin } from "./browser.js";
 import { canonicalReelUrl, discoverReels, readReelMetadata } from "./instagram.js";
 import { mapMetadata } from "./metadata.js";
-import { downloadReel, probeReel } from "./downloader.js";
+import { downloadReel, probeReel, ReelExtractionError } from "./downloader.js";
 import { TransferState } from "./state.js";
 import { uploadTikTok } from "./uploaders/tiktok.js";
 import { uploadTikTokApi } from "./uploaders/tiktok-api.js";
@@ -63,6 +63,10 @@ Instagram login is optional and needed only for private or login-blocked sources
 function isUnavailableReelError(error) {
   const message = String(error?.message || error);
   return /content isn(?:'|’)t available to everyone|can't be seen by certain audiences|not available|private|login required|video unavailable/i.test(message);
+}
+
+function isRecoverableReelExtractionError(error) {
+  return error instanceof ReelExtractionError && error.recoverable;
 }
 
 async function setup(cwd, options) {
@@ -134,11 +138,19 @@ async function transferOne({ cwd, config, reelUrl, instagramId, mode, destinatio
       source = await probeReel({ cwd, reelUrl, downloader });
     } catch (probeError) {
       if (config.defaults.instagramDiscoveryMethod === "extension") {
-        throw new Error(`Could not read Reel metadata without opening another browser: ${probeError.message}`);
+        throw new ReelExtractionError(`Could not read Reel metadata without opening another browser: ${probeError.message}`, {
+          cause: probeError,
+          recoverable: probeError.recoverable
+        });
       }
       const sourceContext = await openPublicBrowser({ headless: true });
       try { source = await readReelMetadata(sourceContext.pages()[0] || await sourceContext.newPage(), reelUrl); }
-      catch { throw new Error(`Could not read this public Reel without login: ${probeError.message}`); }
+      catch (browserError) {
+        throw new ReelExtractionError(
+          `Could not read this public Reel without login: ${probeError.message} | browser fallback: ${browserError.message}`,
+          { cause: probeError }
+        );
+      }
       finally { await sourceContext.close(); }
     }
   } else {
@@ -303,10 +315,18 @@ async function sync(cwd, options) {
       reels,
       processReel: (reelUrl) => transferOne({ cwd, config, reelUrl, ...selected, state, bridge }),
       isUnavailable: isUnavailableReelError,
+      isRecoverable: isRecoverableReelExtractionError,
       markUnavailable: async (reelUrl, error) => {
         for (const [platform, accountId] of selected.destinations) {
           if (!state.has(selected.instagramId, reelUrl, platform, accountId)) {
             state.unavailable(selected.instagramId, reelUrl, platform, accountId, error);
+          }
+        }
+      },
+      markRecoverable: async (reelUrl, error) => {
+        for (const [platform, accountId] of selected.destinations) {
+          if (!state.has(selected.instagramId, reelUrl, platform, accountId)) {
+            state.retry(selected.instagramId, reelUrl, platform, accountId, error);
           }
         }
       }
@@ -314,7 +334,7 @@ async function sync(cwd, options) {
   } finally {
     await bridge?.stop();
   }
-  console.log(`Sync finished: ${summary.completed} completed, ${summary.failed} destination-failed, ${summary.skipped} verified complete, ${summary.inaccessible} inaccessible.`);
+  console.log(`Sync finished: ${summary.completed} completed, ${summary.failed} destination-failed, ${summary.skipped} verified complete, ${summary.inaccessible} inaccessible, ${summary.extractionFailed} extraction-failed.`);
 }
 
 const cwd = process.cwd();
