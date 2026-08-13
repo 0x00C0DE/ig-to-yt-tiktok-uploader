@@ -1,0 +1,16 @@
+node_modules/
+.sessions/
+downloads/
+state/
+config.json
+*.log
+.vendor/
+CookiesDir/
+*.cookie
+.env
+.tiktok_uploader_history
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+coverage/

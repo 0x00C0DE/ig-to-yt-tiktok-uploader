@@ -1,0 +1,13 @@
+diff --git a/tiktok_uploader/tiktok.py b/tiktok_uploader/tiktok.py
+index d321b56..7777777 100644
+--- a/tiktok_uploader/tiktok.py
++++ b/tiktok_uploader/tiktok.py
+@@ -292,4 +292,4 @@
+-					"visibility_type": 0,
+-					"allow_duet": 1,
+-					"allow_stitch": 1,
+-					"allow_comment": 1
++					"visibility_type": visibility_type,
++					"allow_duet": allow_duet,
++					"allow_stitch": allow_stitch,
++					"allow_comment": allow_comment
