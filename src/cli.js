@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { loadConfig, requireAccount, resolveChromeProfile } from "./config.js";
+import { describeChromeProfile, loadConfig, requireAccount, resolveChromeProfile } from "./config.js";
 import { openAccountBrowser, openPublicBrowser, pauseForLogin } from "./browser.js";
 import { canonicalReelUrl, discoverReels, readReelMetadata } from "./instagram.js";
 import { mapMetadata } from "./metadata.js";
@@ -251,9 +251,7 @@ async function sync(cwd, options) {
   let inaccessible = 0;
   try {
     if (bridge && config.defaults.instagramDiscoveryMethod === "extension") {
-      const profileDescription = selected.chromeProfile
-        ? `Chrome profile '${selected.chromeProfile.id}'`
-        : "the current Chrome session";
+      const profileDescription = describeChromeProfile(selected.chromeProfile);
       console.log(`Requesting Reel discovery for @${String(options.handle).replace(/^@/, "")} in ${profileDescription}...`);
       const discovery = bridge.enqueueDiscovery({ handle: options.handle, maxReels: parsedMaximum });
       const result = await bridge.wait(discovery, 20 * 60_000);
