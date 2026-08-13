@@ -15,14 +15,17 @@ class _RetryableUploadResponseError(RuntimeError):
 
 def clone_requests_session(source):
     """Create a new requests session carrying only the current authenticated state."""
-    import requests
-
-    fresh = requests.Session()
+    try:
+        fresh = source.__class__()
+    except Exception:
+        import requests
+        fresh = requests.Session()
     fresh.headers.update(source.headers)
     fresh.cookies.update(source.cookies)
     fresh.proxies.update(source.proxies)
     fresh.verify = source.verify
-    fresh.auth = source.auth
+    if hasattr(source, "auth"):
+        fresh.auth = source.auth
     return fresh
 
 

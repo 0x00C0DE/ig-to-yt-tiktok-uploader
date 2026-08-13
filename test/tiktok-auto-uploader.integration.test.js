@@ -69,8 +69,16 @@ test("Python bridge installs the fresh-session upload initializer retry", async 
     ""
   ].join("\n"));
   fs.writeFileSync(path.join(packageDirectory, "tiktok.py"), [
-    "import requests",
     "attempts = 0",
+    "class Jar(dict):",
+    "    def set(self, name, value, **_kwargs): self[name] = value",
+    "class Session:",
+    "    def __init__(self):",
+    "        self.headers = {}",
+    "        self.cookies = Jar()",
+    "        self.proxies = {}",
+    "        self.verify = True",
+    "        self.auth = None",
     "def upload_to_tiktok(_video, session):",
     "    global attempts",
     "    attempts += 1",
@@ -80,7 +88,7 @@ test("Python bridge installs the fresh-session upload initializer retry", async 
     "    assert session.cookies.get('sessionid') == 'fixture-session'",
     "    return ('video-id', 'session-key', 'upload-id', [123], 'host', 'store-uri', 'auth', object())",
     "def upload_video(*args, **_kwargs):",
-    "    session = requests.Session()",
+    "    session = Session()",
     "    session.cookies.set('sessionid', 'fixture-session', domain='.tiktok.com')",
     "    upload_to_tiktok(args[1], session)",
     "    print('Published successfully')",
