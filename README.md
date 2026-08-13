@@ -53,6 +53,7 @@ extension/                   Chrome MV3 discovery/upload extension
 patches/                     Pinned upstream compatibility patches
 scripts/                     Installer, Python bridges, and validation tools
 src/
+  sync-runner.js             Per-Reel batch continuation and counters
   upload-manager.js          Concurrent platform orchestration
   tiktok-setup.js            Existing-Chrome TikTok session import
   uploaders/                 YouTube and TikTok adapters
@@ -294,13 +295,13 @@ YouTube and TikTok concurrently for each Reel:
 node src/cli.js sync --handle "@source_handle" --instagram ig-source --youtube yt-main --tiktok tt-main --platforms youtube,tiktok --mode publish
 ```
 
-The upload manager starts both selected adapters concurrently. It waits for both results before moving to the next Reel, but a TikTok failure does not cancel a YouTube upload and a YouTube failure does not erase a successful TikTok result. Each result is recorded in its own ledger row. A downloaded file is deleted only after YouTube and every selected destination have completed successfully.
+The upload manager starts both selected adapters concurrently. It waits for both results before moving to the next Reel, but a TikTok failure does not cancel a YouTube upload and a YouTube failure does not erase a successful TikTok result. Each result is recorded in its own ledger row. During `sync`, a destination failure is reported and counted, then the batch continues with the next Reel. A downloaded file is deleted only after YouTube and every selected destination have completed successfully.
 
 For the `tiktok-auto-uploader` method, `Starting upload...` means the background Python adapter has started. No TikTok Studio tab is expected. Completion is recorded only after that process confirms publication; a timeout or error leaves the TikTok ledger row retryable.
 
 ## State, errors, retries, and cleanup
 
-The harness records each source/destination combination in the Notepad-friendly `state/ledger.tsv`. Only a destination whose `status` column is `completed` is skipped. `started`, `retry`, `failed`, and `needs_review` destinations are retried on the next run. A Reel advances to the next discovered Reel only after every selected destination has confirmed completion.
+The harness records each source/destination combination in the Notepad-friendly `state/ledger.tsv`. Only a destination whose `status` column is `completed` is skipped. `started`, `retry`, `failed`, and `needs_review` destinations are retried on the next run. For each Reel, the harness waits until every selected destination has returned a result. It then advances even when one destination failed, retaining that failed row and its downloaded media for a later retry.
 
 With `defaults.deleteAfterYouTubeUpload` enabled, the downloaded MP4 is deleted after YouTube is confirmed and every destination selected for that Reel has completed. If another selected destination fails, the file is retained for retry. The ledger keeps the canonical Reel ID, URL, platform, and account records after deletion, so completed destinations are skipped before any later download or upload.
 
@@ -318,7 +319,7 @@ Use `--max 10` to process at most ten discovered Reels during a test run. Run th
 
 Use `--platforms youtube` or `--platforms tiktok` to temporarily enable only one destination even when both account aliases are present. Use `--platforms tiktok,youtube` for both. The persistent default is controlled by `defaults.enabledPlatforms` in `config.json`.
 
-If the process is interrupted or an uploader errors, that destination is retried on the next run. Because browser pages cannot provide true idempotency keys, a platform that publishes successfully but fails to show a recognizable confirmation could be retried; check account history if that unusual case occurs.
+If the process is interrupted or an uploader errors, that destination is retried on the next run. During `sync`, a destination error does not stop the remaining Reel batch; the final summary includes a `destination-failed` count. The single-Reel `transfer` command still exits unsuccessfully when its destination fails. Unexpected configuration or orchestration errors remain fatal. Because browser pages cannot provide true idempotency keys, a platform that publishes successfully but fails to show a recognizable confirmation could be retried; check account history if that unusual case occurs.
 
 With the default `instagramDiscoveryMethod: "extension"`, discovery uses the selected Chrome profile and its existing Instagram session. In direct-browser fallback mode, omitting `--instagram` and profile selection uses a temporary logged-out browser; private or login-blocked sources then require a configured Instagram alias or a selected Chrome profile.
 
@@ -365,6 +366,7 @@ Deep discovery uses Instaloader profile pagination before falling back to the vi
 - **Dependency/import failure:** rerun the installer using the same Python executable configured as `pythonCommand`.
 - **Signature/Chromium failure:** from `.vendor/TiktokAutoUploader/tiktok_uploader/tiktok-signature`, run `npm.cmd install` and `npx.cmd playwright install chromium`.
 - **TikTok rejects the upload:** the ledger keeps TikTok in `needs_review` while retaining an independently successful YouTube result. Review the platform-aware terminal error before retrying.
+- **`list index out of range` while parsing a caption:** the adapter now preserves an unresolved TikTok `@mention` as plain caption text instead of crashing when TikTok's user lookup omits its expected page marker.
 - **Unsupported video:** the adapter accepts MP4, MOV, and WEBM files and rejects missing or unsupported inputs before starting an external process.
 
 ## Tests

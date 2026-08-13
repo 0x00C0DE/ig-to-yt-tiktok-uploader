@@ -41,6 +41,8 @@ def main() -> int:
         if os.path.exists(config_path):
             Config.load(config_path)
         from tiktok_uploader import tiktok
+        from tiktok_caption import convert_tags_resilient
+        tiktok.convert_tags = convert_tags_resilient
     except Exception as error:
         print(f"TikTokAutoUploader dependency/import failure: {error}", file=sys.stderr)
         return 3
