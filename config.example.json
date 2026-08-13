@@ -1,7 +1,7 @@
 {
   "chromeProfiles": {
-    "personal": {
-      "label": "Personal Chrome profile",
+    "creator": {
+      "label": "Creator Chrome profile",
       "profileDirectory": "Default"
     },
     "work": {
@@ -43,6 +43,6 @@
     "deepInstagramDiscovery": true,
     "deleteAfterYouTubeUpload": true,
     "instagramDiscoveryMethod": "extension",
-    "chromeProfile": "personal"
+    "chromeProfile": "creator"
   }
 }
