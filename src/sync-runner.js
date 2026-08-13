@@ -8,9 +8,11 @@ export async function processReelSequence({
   processReel,
   isUnavailable,
   markUnavailable = async () => {},
+  isRecoverable = () => false,
+  markRecoverable = async () => {},
   logger = console
 }) {
-  const summary = { completed: 0, skipped: 0, failed: 0, inaccessible: 0 };
+  const summary = { completed: 0, skipped: 0, failed: 0, inaccessible: 0, extractionFailed: 0 };
   for (const [index, reelUrl] of reels.entries()) {
     logger.log?.(`\n[${index + 1}/${reels.length}] ${reelUrl}`);
     try {
@@ -27,10 +29,17 @@ export async function processReelSequence({
       }
       summary.completed++;
     } catch (error) {
-      if (!isUnavailable(error)) throw error;
-      await markUnavailable(reelUrl, error);
-      summary.inaccessible++;
-      logger.warn?.(`Skipping inaccessible Reel and continuing: ${error.message}`);
+      if (isUnavailable(error)) {
+        await markUnavailable(reelUrl, error);
+        summary.inaccessible++;
+        logger.warn?.(`Skipping inaccessible Reel and continuing: ${error.message}`);
+      } else if (isRecoverable(error)) {
+        await markRecoverable(reelUrl, error);
+        summary.extractionFailed++;
+        logger.warn?.(`Reel extraction failed after retries; retaining it for a future retry and continuing to the next Reel: ${error.message}`);
+      } else {
+        throw error;
+      }
     }
   }
   return summary;

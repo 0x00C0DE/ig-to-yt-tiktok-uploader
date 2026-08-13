@@ -205,7 +205,9 @@ Platform-only objects such as Instagram collaborators, locations, product tags, 
 4. Copy `config.example.json` to `config.json` and edit the account IDs and labels. IDs are local aliases, not usernames.
 5. To use the HTTP-based TikTok adapter, run `npm.cmd run install:tiktok-uploader`. Set `TIKTOK_PYTHON` to a Python 3.9+ executable first if `python` points to an older installation. The adapter also honors this variable at upload/login time; alternatively set the same executable as the account's `pythonCommand`.
 
-The default downloader is `yt-dlp`. It is intentionally isolated behind `src/downloader.js`, so a different command or provider adapter can replace it without changing account or upload logic. Never enter an Instagram password into a third-party downloader.
+The default downloader is `yt-dlp`. It is intentionally isolated behind `src/downloader.js`, so a different command or provider adapter can replace it without changing account or upload logic. `downloader.retries` controls attempts per extraction route and defaults to three; `downloader.retryDelayMs` controls the delay between transient network retries and defaults to 1000 milliseconds. Never enter an Instagram password into a third-party downloader.
+
+An optional command-based provider can be configured with `downloader.fallbackCommand` and `downloader.fallbackArgs`. It runs only after public and existing-Chrome extraction attempts fail. The fallback command must accept the remaining `yt-dlp`-style extraction arguments used by the harness; do not configure a service that requires placing credentials in tracked files or command-line arguments.
 
 ### Environment variables and credentials
 
@@ -387,6 +389,8 @@ Deep discovery uses Instaloader profile pagination before falling back to the vi
 - **`list index out of range` while parsing a caption:** the adapter now preserves an unresolved TikTok `@mention` as plain caption text instead of crashing when TikTok's user lookup omits its expected page marker.
 - **`list index out of range` immediately after `Uploading video...`:** the upstream uploader received no usable upload endpoint from TikTok. The adapter now validates that response and retries with fresh authenticated sessions instead of indexing an empty list.
 - **Unsupported video:** the adapter accepts MP4, MOV, and WEBM files and rejects missing or unsupported inputs before starting an external process.
+- **Instagram `curl: (28) Connection timed out`:** each extraction route is retried according to `downloader.retries`. If all routes fail, `sync` records the incomplete destination rows as `retry`, reports an `extraction-failed` count, and continues with the next Reel.
+- **`Could not copy Chrome cookie database`:** Chrome may lock its live cookie database. The harness proceeds to `downloader.fallbackCommand` when one is configured; otherwise that Reel remains retryable and `sync` advances instead of terminating the batch. Closing Chrome can also make direct cookie extraction available, but is not required for the batch to continue.
 
 ## Tests
 
