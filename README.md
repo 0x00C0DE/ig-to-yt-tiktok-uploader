@@ -19,10 +19,6 @@ The harness is a local CLI and Chrome extension, not a hosted service. It does n
 
 ## Architecture and workflow
 
-For cursor-based navigation, open the [interactive architecture viewer](docs/architecture.html) from a local clone. Its control pad follows the pointer, the diagram can be dragged to pan, and zoom is scoped to the diagram when using **Ctrl + mouse wheel**, **Ctrl + +**, **Ctrl + -**, or **Ctrl + 0**. Click or point at the diagram before using the keyboard shortcuts.
-
-> GitHub renders README content in a security sandbox that does not allow Markdown to register custom mouse or keyboard handlers. The Mermaid diagram below is therefore the accessible static fallback; the linked, self-contained viewer provides the requested interaction without loading external scripts.
-
 ```mermaid
 flowchart LR
     IG["Instagram handle in selected Chrome profile"] --> D["Reel discovery"]
