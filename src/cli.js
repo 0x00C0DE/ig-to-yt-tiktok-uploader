@@ -37,10 +37,10 @@ Setup a stored login:
   npm run setup -- --platform youtube --account yt-main
 
 Transfer one Reel:
-  npm run run -- --reel URL --tiktok tt-main --youtube yt-main --mode draft
+  npm run run -- --reel URL --tiktok tt-main --youtube yt-main --mode publish
 
 Synchronize all accessible Reels from a handle:
-  node src/cli.js sync --handle @myhandle --tiktok tt-main --youtube yt-main --mode draft
+  node src/cli.js sync --handle @myhandle --tiktok tt-main --youtube yt-main --mode publish
 
 Limit a run to one destination:
   node src/cli.js sync --handle @myhandle --tiktok tt-main --youtube yt-main --platforms youtube --mode publish
@@ -48,7 +48,7 @@ Limit a run to one destination:
 Open the editable transfer ledger:
   node src/cli.js ledger
 
-Destination flags are optional; specify either or both. Use --platforms tiktok, youtube, or tiktok,youtube. Mode is draft (default) or publish.
+Destination flags are optional; specify either or both. Use --platforms tiktok, youtube, or tiktok,youtube. Mode is draft or publish; TikTok API and TikTokAutoUploader accounts require publish.
 Instagram login is optional and needed only for private or login-blocked sources.`);
 }
 

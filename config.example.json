@@ -24,7 +24,7 @@
     }
   },
   "defaults": {
-    "mode": "draft",
+    "mode": "publish",
     "headless": false,
     "downloadDirectory": "downloads",
     "uploadMethod": "extension",
