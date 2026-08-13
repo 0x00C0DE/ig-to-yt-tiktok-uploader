@@ -1,0 +1,37 @@
+{
+  "downloader": {
+    "type": "direct",
+    "command": "yt-dlp"
+  },
+  "accounts": {
+    "instagram": {},
+    "tiktok": {
+      "tt-main": {
+        "label": "Main TikTok",
+        "handle": "@ihooneez",
+        "uploadMethod": "tiktok-auto-uploader",
+        "sessionName": "ihooneez",
+        "uploaderPath": ".vendor/TiktokAutoUploader",
+        "pythonCommand": "python",
+        "visibility": 0,
+        "allowComment": true,
+        "allowDuet": false,
+        "allowStitch": false
+      }
+    },
+    "youtube": {
+      "yt-main": { "label": "Main YouTube channel", "handle": "@ihooneez" }
+    }
+  },
+  "defaults": {
+    "mode": "draft",
+    "headless": false,
+    "downloadDirectory": "downloads",
+    "uploadMethod": "extension",
+    "enabledPlatforms": ["tiktok", "youtube"],
+    "deepInstagramDiscovery": true,
+    "deleteAfterYouTubeUpload": true,
+    "instagramDiscoveryMethod": "extension",
+    "chromeProfileDirectory": "Profile 3"
+  }
+}

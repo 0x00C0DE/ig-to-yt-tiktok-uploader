@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Social Reel Bridge",
+  "version": "0.7.2",
+  "description": "Uploads locally prepared Instagram Reels to TikTok and YouTube using the current Chrome session.",
+  "permissions": ["alarms", "tabs", "storage", "debugger"],
+  "host_permissions": [
+    "http://127.0.0.1:43117/*",
+    "https://www.instagram.com/*",
+    "https://www.tiktok.com/*",
+    "https://studio.youtube.com/*"
+  ],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "Social Reel Bridge" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.instagram.com/*/reels/*"],
+      "js": ["content-common.js", "instagram.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.tiktok.com/tiktokstudio/upload*"],
+      "js": ["content-common.js", "tiktok.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://studio.youtube.com/*"],
+      "js": ["content-common.js", "youtube.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
