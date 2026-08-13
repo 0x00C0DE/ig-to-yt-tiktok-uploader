@@ -20,6 +20,7 @@ import {
   uploadTikTokAutoUploader
 } from "./uploaders/tiktok-auto-uploader.js";
 import { setupTikTokAutoUploaderInChrome } from "./tiktok-setup.js";
+import { processReelSequence } from "./sync-runner.js";
 
 function parseArgs(argv) {
   const [command = "help", ...rest] = argv;
@@ -119,6 +120,7 @@ async function transferOne({ cwd, config, reelUrl, instagramId, mode, destinatio
     console.log(`Skipping ${reelUrl}: verified complete for every selected destination.`);
     return { skipped: true };
   }
+  const failures = [];
   for (const [platform, accountId] of pending) {
     const previous = state.status(instagramId, reelUrl, platform, accountId);
     if (previous && previous !== "completed") console.log(`Retrying ${platform}/${accountId}; previous status was ${previous}.`);
@@ -200,9 +202,8 @@ async function transferOne({ cwd, config, reelUrl, instagramId, mode, destinatio
       sourceAccount: instagramId, reelUrl, videoPath, metadata, mode, destinations: pending
     });
     const failures = Object.values(results).filter((result) => result.status === "failed");
-    if (failures.length) throw new Error(`${failures.length} destination upload(s) failed or require review.`);
     await cleanupCompletedVideo();
-    return { skipped: false };
+    return { skipped: false, failures };
   }
 
   for (const [platform, accountId] of pending) {
@@ -227,11 +228,12 @@ async function transferOne({ cwd, config, reelUrl, instagramId, mode, destinatio
     } catch (error) {
       state.needsReview(instagramId, reelUrl, platform, accountId, error);
       await context.close();
-      throw error;
+      failures.push({ platform, accountId, status: "failed", message: error.message, error });
+      console.error(`[${platform}][${accountId}] ${error.message}`);
     }
   }
   await cleanupCompletedVideo();
-  return { skipped: false };
+  return { skipped: false, failures };
 }
 
 async function transfer(cwd, options) {
@@ -245,6 +247,9 @@ async function transfer(cwd, options) {
   if (bridge) await bridge.start();
   try {
     const result = await transferOne({ cwd, config, reelUrl, ...selected, state: new TransferState(cwd), bridge });
+    if (result.failures?.length) {
+      throw new Error(`${result.failures.length} destination upload(s) failed or require review.`);
+    }
   }
   finally { await bridge?.stop(); }
 }
@@ -262,9 +267,7 @@ async function sync(cwd, options) {
     : null;
   if (bridge) await bridge.start();
   let reels;
-  let completed = 0;
-  let skipped = 0;
-  let inaccessible = 0;
+  let summary;
   try {
     if (bridge && config.defaults.instagramDiscoveryMethod === "extension") {
       const profileDescription = describeChromeProfile(selected.chromeProfile);
@@ -296,27 +299,22 @@ async function sync(cwd, options) {
     }
     console.log(`Discovered ${reels.length} accessible Reel(s) for ${options.handle}.`);
 
-    for (const [index, reelUrl] of reels.entries()) {
-      console.log(`\n[${index + 1}/${reels.length}] ${reelUrl}`);
-      try {
-        const result = await transferOne({ cwd, config, reelUrl, ...selected, state, bridge });
-        if (result.skipped) skipped++;
-        else completed++;
-      } catch (error) {
-        if (!isUnavailableReelError(error)) throw error;
+    summary = await processReelSequence({
+      reels,
+      processReel: (reelUrl) => transferOne({ cwd, config, reelUrl, ...selected, state, bridge }),
+      isUnavailable: isUnavailableReelError,
+      markUnavailable: async (reelUrl, error) => {
         for (const [platform, accountId] of selected.destinations) {
           if (!state.has(selected.instagramId, reelUrl, platform, accountId)) {
             state.unavailable(selected.instagramId, reelUrl, platform, accountId, error);
           }
         }
-        inaccessible++;
-        console.warn(`Skipping inaccessible Reel and continuing: ${error.message}`);
       }
-    }
+    });
   } finally {
     await bridge?.stop();
   }
-  console.log(`Sync finished: ${completed} processed, ${skipped} verified complete, ${inaccessible} inaccessible.`);
+  console.log(`Sync finished: ${summary.completed} completed, ${summary.failed} destination-failed, ${summary.skipped} verified complete, ${summary.inaccessible} inaccessible.`);
 }
 
 const cwd = process.cwd();
