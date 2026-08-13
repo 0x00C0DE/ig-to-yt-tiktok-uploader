@@ -343,6 +343,6 @@ Tests mock the YouTube and TikTok network boundaries; they never publish product
 
 ## License
 
-No license has been granted for this project yet. All rights are reserved by the repository owner until a project license is selected. Third-party components retain their own licenses; see `THIRD_PARTY_NOTICES.md` and the installed upstream license files.
+Social Reel Bridge is licensed under the [MIT License](LICENSE). Copyright © 2026 0x00C0DE.
 
-See `THIRD_PARTY_NOTICES.md` for attribution and the installed upstream `LICENSE` for its MIT terms.
+Third-party components retain their own licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and the installed upstream license files for their complete terms.
