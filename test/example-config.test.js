@@ -30,3 +30,15 @@ test("tracked examples use generic handles and expose selectable Chrome profiles
   assert.ok(example.defaults.chromeProfile);
   assert.equal(example.defaults.chromeProfileDirectory, undefined);
 });
+
+test("tracked examples contain no machine-specific user paths", () => {
+  const trackedExamples = [
+    fs.readFileSync(new URL("../README.md", import.meta.url), "utf8"),
+    fs.readFileSync(new URL("../config.example.json", import.meta.url), "utf8"),
+    fs.readFileSync(new URL("../.env.example", import.meta.url), "utf8")
+  ].join("\n");
+
+  assert.doesNotMatch(trackedExamples, /[A-Za-z]:\\Users\\[^\\\s]+/i);
+  assert.doesNotMatch(trackedExamples, /\/Users\/[^/\s]+/);
+  assert.doesNotMatch(trackedExamples, /\/home\/[^/\s]+/);
+});

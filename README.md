@@ -54,6 +54,7 @@ patches/                     Pinned upstream compatibility patches
 scripts/                     Installer, Python bridges, and validation tools
 src/
   upload-manager.js          Concurrent platform orchestration
+  tiktok-setup.js            Existing-Chrome TikTok session import
   uploaders/                 YouTube and TikTok adapters
   cli.js                     setup, transfer, sync, and ledger commands
 state/                       Local editable ledger (ignored)
@@ -61,6 +62,37 @@ downloads/                   Temporary downloaded media (ignored)
 test/                        Offline unit and process-boundary tests
 config.example.json          Secret-free account/configuration template
 ```
+
+## Current workflow quick start
+
+These examples use placeholder handles and local account aliases. Replace `@source_handle`, `ig-source`, `yt-main`, `tt-main`, and `creator` with values from your ignored `config.json`; do not put real account details in tracked files.
+
+1. Install dependencies and the pinned TikTokAutoUploader integration:
+
+   ```powershell
+   npm.cmd install
+   npm.cmd run install:tiktok-uploader
+   ```
+
+2. Open the Chrome profile mapped to the logical alias `creator`. Load or reload the unpacked `extension` directory, enter `creator` in the extension popup, and choose **Save and check for upload**.
+
+3. While signed into TikTok in that same running Chrome profile, import the session once:
+
+   ```powershell
+   npm.cmd run setup -- --platform tiktok --account tt-main --chrome-profile creator
+   ```
+
+   This opens TikTok in the existing profile, imports only TikTokAutoUploader's two required cookies into the ignored local session store, and closes the setup tab. It does not create another Chrome profile or launch an incognito-style browser.
+
+4. Test one Reel on both destinations:
+
+   ```powershell
+   node src/cli.js sync --handle "@source_handle" --instagram ig-source --youtube yt-main --tiktok tt-main --platforms youtube,tiktok --chrome-profile creator --mode publish --max 1
+   ```
+
+5. After verifying the destination accounts, omit `--max 1` or set a larger limit to process more accessible Reels. The harness processes one Reel at a time; for that Reel, YouTube and TikTok start concurrently, and the next Reel waits for both results.
+
+TikTokAutoUploader publishes through a background Python process and TikTok web endpoints. After the session-import setup, it normally does **not** open TikTok Studio or show a browser upload-progress page. The terminal can remain on `Starting upload...` until the process returns success or failure; the default TikTok process timeout is ten minutes.
 
 ## Install the Chrome extension (recommended uploader)
 
@@ -264,6 +296,8 @@ node src/cli.js sync --handle "@source_handle" --instagram ig-source --youtube y
 
 The upload manager starts both selected adapters concurrently. It waits for both results before moving to the next Reel, but a TikTok failure does not cancel a YouTube upload and a YouTube failure does not erase a successful TikTok result. Each result is recorded in its own ledger row. A downloaded file is deleted only after YouTube and every selected destination have completed successfully.
 
+For the `tiktok-auto-uploader` method, `Starting upload...` means the background Python adapter has started. No TikTok Studio tab is expected. Completion is recorded only after that process confirms publication; a timeout or error leaves the TikTok ledger row retryable.
+
 ## State, errors, retries, and cleanup
 
 The harness records each source/destination combination in the Notepad-friendly `state/ledger.tsv`. Only a destination whose `status` column is `completed` is skipped. `started`, `retry`, `failed`, and `needs_review` destinations are retried on the next run. A Reel advances to the next discovered Reel only after every selected destination has confirmed completion.
@@ -313,6 +347,7 @@ Deep discovery uses Instaloader profile pagination before falling back to the vi
 ## Security considerations
 
 - `config.json`, `.env`, `.vendor/`, `.sessions/`, cookies, downloaded media, state, logs, Python caches, and coverage output are ignored by Git.
+- Keep real handles, profile labels, Windows/macOS usernames, and account-specific paths only in ignored local configuration. Tracked documentation and examples must use placeholders.
 - Store access tokens and proxies in environment variables or a secret manager. Never put their values in account configuration or command history.
 - TikTokAutoUploader cookie files grant account access. Protect them like passwords and remove an individual cookie when revoking that local session.
 - The extension requests `tabs`, `storage`, and `debugger` permissions. It attaches the debugger only long enough to assign a local file to YouTube's native input or capture TikTokAutoUploader's two required TikTok cookies, then detaches.
@@ -324,6 +359,7 @@ Deep discovery uses Instaloader profile pagination before falling back to the vi
 - **Python rejected during installation:** upstream requires Python 3.9+. Install a newer Python and set `$env:TIKTOK_PYTHON` to its executable before running `npm.cmd run install:tiktok-uploader`.
 - **Uploader not installed:** run `npm.cmd run install:tiktok-uploader`. The installer verifies the pinned upstream revision instead of silently using a different checkout.
 - **Session cookie missing or expired:** rerun `npm.cmd run setup -- --platform tiktok --account tt-main` for that exact alias.
+- **Terminal remains on `Starting upload...`:** TikTokAutoUploader runs without a TikTok Studio tab and buffers its subprocess output. Wait for its completion or the configured `timeoutMs` (ten minutes by default); then use the reported terminal error and retryable ledger status for diagnosis.
 - **Setup opens no TikTok tab:** reload the unpacked extension in the intended Chrome profile, save that profile's logical alias in the extension popup, and confirm that the alias matches `defaults.chromeProfile` or `--chrome-profile`.
 - **Setup asks for a logical Chrome profile:** migrate the legacy `defaults.chromeProfileDirectory` setting to a named entry in `chromeProfiles`, set `defaults.chromeProfile` to that alias, and save the same alias in the extension popup.
 - **Dependency/import failure:** rerun the installer using the same Python executable configured as `pythonCommand`.
@@ -346,7 +382,7 @@ Tests mock the YouTube and TikTok network boundaries; they never publish product
 1. Create a focused feature branch from `main`.
 2. Keep platform network calls behind uploader adapters and inject fakes in automated tests.
 3. Add or update tests before changing behavior.
-4. Run `npm.cmd run verify` and compile both Python scripts before opening a pull request.
+4. Run `npm.cmd run verify` and compile all Python helpers before opening a pull request.
 5. Never add real account identifiers, cookies, downloaded media, tokens, or session directories to fixtures.
 
 ## Planned improvements
